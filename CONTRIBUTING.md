@@ -19,25 +19,60 @@ bug, create an associated issue and illustrate the bug with a minimal
 
 ### Setting up the project
 
-Install [uv](https://docs.astral.sh/uv/getting-started/installation/) and
-[Quarto](https://quarto.org/docs/get-started/), then clone the repository and
-create the virtual environment from the root of the repository:
+Install [uv](https://docs.astral.sh/uv/getting-started/installation/), [Quarto](https://quarto.org/docs/get-started/), and [R](https://cran.r-project.org/). Then clone the repository and create the Python virtual environment from the root of the repository:
 
-``` bash
+```bash
 git clone https://github.com/UBC-MDS-2026-27/DSCI-522-Group-27.git
 cd DSCI-522-Group-27
 uv sync
 ```
 
-To re-run the analysis and render the report:
+**Python dependencies**
 
-``` bash
+Python dependencies are managed using `uv`. If your changes require a new Python package, add it using:
+
+```bash
+uv add <package>
+```
+
+This adds the dependency to `pyproject.toml` and updates `uv.lock` with the resolved package versions. Commit both files so that other contributors can recreate the same Python environment using `uv sync`.
+
+**R dependencies**
+
+R dependencies are managed using [`renv`](https://rstudio.github.io/renv/), which records package dependencies and their versions in an `renv.lock` file.
+
+If this is your first time setting up the R environment, open an R session from the project root and run:
+
+```r
+install.packages("renv")
+renv::restore()
+```
+
+This installs the R packages specified in `renv.lock`, recreating the project's R environment.
+
+If your changes require a new R package, install it using:
+
+```r
+renv::install("<package>")
+```
+
+Then update the lockfile:
+
+```r
+renv::snapshot()
+```
+
+This records the new dependency and its version in `renv.lock`. Commit the updated `renv.lock` file so that other contributors can install the same R dependencies using `renv::restore()`.
+
+**Running the analysis**
+
+To re-run the analysis and render the Quarto report from the project root:
+
+```bash
 uv run quarto render
 ```
 
-If your change needs a new Python package, add it with `uv add <package>`
-(this pins an exact version in `pyproject.toml` and updates `uv.lock`),
-and commit both files.
+Ensure that both `uv.lock` and `renv.lock` are committed whenever their respective dependencies change. This allows contributors to reproduce the Python and R environments used by the project.
 
 ### Pull request process
 
