@@ -1,0 +1,239 @@
+---
+title: "Predicting Term-Deposit Subscription: Data Pipeline and EDA"
+subtitle: "UCI Bank Marketing dataset"
+date: "`r Sys.Date()`"
+output:
+  html_document:
+    toc: true
+    toc_float: true
+    number_sections: true
+    df_print: paged
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, message = FALSE, warning = FALSE,
+                      fig.width = 9, fig.height = 5, fig.align = "center")
+```
+
+```{r packages}
+# install.packages(c("tidyverse", "rsample", "skimr", "scales"))
+library(tidyverse)
+library(rsample)   # stratified train/test split
+library(skimr)     # compact data summaries
+library(scales)
+
+theme_set(theme_minimal(base_size = 12))
+y_cols <- c(no = "grey65", yes = "#1f77b4")
+```
+
+# Download the data to `data/raw/`
+
+The UCI zip contains two nested zips (`bank.zip` and `bank-additional.zip`). We use `bank-full.csv` (45,211 rows, 16 predictors + `y`), which is inside `bank.zip`. The download is skipped if the file is already present, so re-knitting doesn't hit the server each time.
+
+```{r download}
+data_url <- "https://archive.ics.uci.edu/static/public/222/bank+marketing.zip"
+raw_dir  <- file.path("data", "raw")
+dir.create(raw_dir, recursive = TRUE, showWarnings = FALSE)
+
+zip_path <- file.path(raw_dir, "bank+marketing.zip")
+
+if (!file.exists(zip_path)) {
+  options(timeout = max(300, getOption("timeout")))   # slow connections
+  download.file(data_url, destfile = zip_path, mode = "wb")
+}
+
+# Unzip the outer archive, then the inner bank.zip
+unzip(zip_path, exdir = raw_dir)
+inner_zip <- file.path(raw_dir, "bank.zip")
+if (file.exists(inner_zip)) unzip(inner_zip, exdir = raw_dir)
+
+raw_csv <- list.files(raw_dir, pattern = "^bank-full\\.csv$",
+                      recursive = TRUE, full.names = TRUE)[1]
+stopifnot("bank-full.csv not found after unzipping" = !is.na(raw_csv))
+
+raw_csv
+list.files(raw_dir, recursive = TRUE)
+```
+
+# Wrangle and clean, saving to `data/processed/`
+
+The raw file is **semicolon-delimited**. Cleaning steps:
+
+1.  Read with the correct delimiter.
+2.  Convert text columns to factors, with `y` levelled `no`/`yes` and `month` in calendar order.
+3.  Recode the sentinel `pdays = -1` ("never previously contacted") as a logical flag `prev_contacted` plus `pdays` set to `NA`. As a number, −1 would wrongly read as "very recently contacted".
+4.  Keep `"unknown"` as its own factor level. Whether it is informative is checked in the EDA, and any imputation happens later, after the split.
+5.  Drop `duration` (length of the last call). It is only known after the call ends, so it leaks the outcome.
+
+```{r read-raw}
+bank_raw <- read_delim(raw_csv, delim = ";", show_col_types = FALSE)
+dim(bank_raw)
+
+```
+
+```{r}
+glimpse(bank_raw)
+```
+
+```{r clean}
+month_levels <- c("jan", "feb", "mar", "apr", "may", "jun",
+                  "jul", "aug", "sep", "oct", "nov", "dec")
+
+bank_clean <- bank_raw |>
+  mutate(
+    across(where(is.character), as.factor),
+    y      = factor(y, levels = c("no", "yes")),
+    month  = factor(month, levels = month_levels),
+    prev_contacted = pdays != -1,
+    pdays  = na_if(pdays, -1)
+  ) |>
+  select(-duration)
+
+# Sanity checks
+stopifnot(nrow(bank_clean) == nrow(bank_raw),
+          !anyNA(bank_clean$y),
+          all(!is.na(bank_clean$month)))
+sum(duplicated(bank_clean))   # count of exact duplicate rows
+
+glimpse(bank_clean)
+```
+
+```{r save-processed}
+processed_dir <- file.path("data", "processed")
+dir.create(processed_dir, recursive = TRUE, showWarnings = FALSE)
+
+write_csv(bank_clean, file.path(processed_dir, "bank_clean.csv"))
+```
+
+# Split into training and test sets
+
+The split happens **before** any EDA or preprocessing, so nothing we learn from the data is influenced by the test set. Because `y` is imbalanced, the split is **stratified on `y`**, which keeps the yes/no proportion the same in both sets. A seed makes it reproducible.
+
+```{r split}
+set.seed(552)
+bank_split <- initial_split(bank_clean, prop = 0.75, strata = y)
+bank_train <- training(bank_split)
+bank_test  <- testing(bank_split)
+
+write_csv(bank_train, file.path(processed_dir, "bank_train.csv"))
+write_csv(bank_test,  file.path(processed_dir, "bank_test.csv"))
+
+tibble(set = c("train", "test"),
+       n   = c(nrow(bank_train), nrow(bank_test)),
+       yes_rate = c(mean(bank_train$y == "yes"), mean(bank_test$y == "yes")))
+```
+
+# Exploratory data analysis (training data only)
+
+## Overview
+
+```{r skim}
+skim(bank_train)
+```
+
+## Target variable
+
+```{r target}
+bank_train |>
+  count(y) |>
+  mutate(prop = n / sum(n))
+```
+
+Only about 12% of clients subscribed, so the classes are imbalanced. Accuracy alone would be a misleading metric for a model, because predicting "no" for everyone would already be about 88% accurate.
+
+## Missing and `"unknown"` values
+
+```{r missing}
+bank_train |>
+  summarise(across(everything(),
+                   ~ sum(is.na(.) | (is.factor(.) & . == "unknown")))) |>
+  pivot_longer(everything(), names_to = "variable", values_to = "n_missing") |>
+  filter(n_missing > 0) |>
+  arrange(desc(n_missing))
+```
+
+`pdays` is `NA` for clients who were never contacted before, and `poutcome` is mostly `"unknown"` for the same reason. `contact`, `education` and `job` have smaller numbers of unknowns.
+
+## Numeric predictors by outcome
+
+```{r numeric-summary}
+num_vars <- c("age", "balance", "day", "campaign", "pdays", "previous")
+
+bank_train |>
+  select(all_of(num_vars), y) |>
+  pivot_longer(-y, names_to = "variable") |>
+  group_by(variable, y) |>
+  summarise(mean   = mean(value, na.rm = TRUE),
+            median = median(value, na.rm = TRUE),
+            sd     = sd(value, na.rm = TRUE),
+            .groups = "drop") |>
+  mutate(across(where(is.double), ~ round(., 1)))
+```
+
+## Categorical predictors by outcome
+
+Proportion of clients who subscribed in each group:
+
+```{r cat-summary}
+bank_train |>
+  group_by(poutcome) |>
+  summarise(n = n(), prop_yes = mean(y == "yes"))
+
+bank_train |>
+  group_by(contact) |>
+  summarise(n = n(), prop_yes = mean(y == "yes"))
+```
+
+# Visualizations of the training data
+
+## Histograms of the numeric predictors
+
+```{r viz-hist, fig.height=6}
+bank_train |>
+  select(all_of(num_vars)) |>
+  pivot_longer(everything()) |>
+  ggplot(aes(value)) +
+  geom_histogram(bins = 30, fill = "steelblue", colour = "white") +
+  facet_wrap(~ name, scales = "free") +
+  labs(title = "Distributions of numeric predictors (training data)",
+       x = NULL, y = "Count")
+```
+
+## Boxplots of numeric predictors by outcome
+
+```{r viz-box, fig.height=6}
+bank_train |>
+  select(all_of(num_vars), y) |>
+  pivot_longer(-y) |>
+  ggplot(aes(y, value, fill = y)) +
+  geom_boxplot(outlier.alpha = 0.2) +
+  facet_wrap(~ name, scales = "free_y") +
+  scale_fill_manual(values = y_cols, guide = "none") +
+  labs(title = "Numeric predictors by subscription outcome (training data)",
+       x = "Subscribed", y = NULL)
+```
+
+## Subscription by categorical predictor
+
+```{r viz-bar, fig.height=8}
+bank_train |>
+  select(job, marital, education, contact, month, poutcome, y) |>
+  pivot_longer(-y, values_to = "level") |>
+  ggplot(aes(y = level, fill = y)) +
+  geom_bar(position = "fill") +
+  facet_wrap(~ name, scales = "free_y", ncol = 2) +
+  scale_x_continuous(labels = percent) +
+  scale_fill_manual(values = y_cols) +
+  labs(title = "Proportion subscribing within each group (training data)",
+       x = "Proportion", y = NULL, fill = "Subscribed")
+```
+
+# Summary of EDA findings
+
+- **Class imbalance:** about 12% "yes".
+- **Skewed numerics:** `balance`, `campaign` and `previous` have long right tails and outliers, and may need transforming in preprocessing.
+- **`poutcome`:** clients whose previous campaign was a success subscribe much more often.
+- **`"unknown"` values:** these are concentrated in `poutcome` and `contact`.
+
+```         
+```
