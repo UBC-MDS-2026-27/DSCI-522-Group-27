@@ -460,7 +460,7 @@ We evaluated whether eight client characteristics and the previous marketing cam
 
 ## Jonah additions below:
 
-We chose to use a simple classification model using a Logistic Regression with all nine predictors. To predict whether a client would accept the term deposit, we used 5-fold cross validation to select the classification threshold that maximized mean F1. We found that a threshold of 0.15 was optimal among the thresholds tested. This threshold was chosen using cross-validation folds from the training data only, not the test set, so the final evaluation on the test set is unbiased.
+We chose to use a classification model using a Logistic Regression with all nine predictors. To predict whether a client would accept the term deposit, we used 5-fold cross validation to select the classification threshold that maximized mean F1. We checked across a range of possible thresholds below 0.5 due to the heavily imbalanced classes in our dataset. We found that a threshold of 0.15 was optimal among the thresholds tested. Because the threshold was selected using only training-data folds, the test set gives an unbiased estimate of performance.
 
 ```{r}
 #| include: false
@@ -545,12 +545,16 @@ logistic_prob <- predict(logistic_fit, test_data, type = "prob")$.pred_yes
 actual_yes <- test_data$y == "yes"
 logistic_yes <- logistic_prob >= 0.15
 
+accuracy = mean(logistic_yes == actual_yes)
+precision = mean(actual_yes[logistic_yes])
+recall = mean(logistic_yes[actual_yes])
+
 # Calculate F1 and other metric scores
 scores <- rbind(
   "Logistic regression" = c(
-    accuracy = mean(logistic_yes == actual_yes),
-    precision = mean(actual_yes[logistic_yes]),
-    recall = mean(logistic_yes[actual_yes]),
+    accuracy = accuracy,
+    precision = precision,
+    recall = recall,
     f1 = 2 * precision * recall / (precision + recall)
   )
 )
@@ -574,7 +578,7 @@ kable(data.frame(
 ))
 ```
 
-Our model performed well on the test data relative to the training data, only seeing a slight decrease in the mean F1 score from 35.56% to 35.07% (Tables x and y). However, the model is still miscategorizing many clients. The confusion matrix (Table Z) shows that the model has more false negatives than true positives. This is harmful for both bank and clients, as the optimal deposit type was not provided leading to missed profit and consumer surplus gains. Additionally, the model also has a large number of false positives, which may be harmful to the bank if resources are scarce and efficient allocation is needed.
+Test performance was consistent with cross-validation (F1 35.07% vs. 35.56%), suggesting the model did not overfit (Tables x and y). However, the model is still miscategorizing many clients. The confusion matrix (Table Z) shows that the model has more false negatives than true positives. A false negative means a likely subscriber is never called, so the bank loses a sale and the client misses a product that suited them.Additionally, the model also has a large number of false positives, which may be harmful to the bank if resources are scarce and efficient allocation is needed.
 
 Table Z. The confusion matrix of model performance on test data at the 0.15 threshold level. Rows are the predictions, while columns are the true class.
 
@@ -589,6 +593,14 @@ cm_test <- conf_mat(test_preds_class, truth = y, estimate = .pred_class)
 cm_test
 autoplot(cm_test, type = "heatmap")
 ```
+
+While there is promise in this model as a tool to build a more targeted call list to match clients with term deposits, it still requires more work. The logistic regression model did show that information available before a marketing call can help identify clients who are likely to subscribe to a term deposit. However, even using a threshold of 0.15 to maximize the F1 score, recall was only 44.61%, meaning the model still missed 55.39% of the clients who would have invested in term deposits. While tuning on a slightly finer grid may help to improve our score metrics, it is likely our predictor variables are may not be carrying a strong enough signal. Logistic regression assumes that age and account balance have linear relationships with the log-odds of subscription and that predictor effects are additive on the log-odds scale. These assumptions may miss nonlinear patterns or interactions among client characteristics.
+
+Additionally, we evaluated the model on one test split, so its performance may differ in later campaigns. The data source (Moro et al., 2014) is also limited to Portugeuse banking clients from the period of 2008-2013. This specific time and location sample, which includes the 2008 Financial Crisis, may affect applicability to other countries and/or time periods.
+
+A follow-up study could evaluate the model on a later campaign and ask how many subscribers it identifies when the bank can contact only a fixed number of clients.
+
+**OLD below:**
 
 ### Stratified five-fold cross-validation
 
