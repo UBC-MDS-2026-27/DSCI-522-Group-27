@@ -1,0 +1,190 @@
+---
+title: "Predicting Bank Term Deposit Subscription"
+format:
+  html:
+    embed-resources: true
+---
+## Method
+
+### Preprocessing
+We evaluated whether eight client characteristics and the previous marketing campaign outcome could predict term deposit subscription more effectively than a majority-class baseline. The client characteristics were age, marital status, occupation, education, credit default, average yearly account balance, housing loan, and personal loan. The ninth predictor, `poutcome`, records the previous campaign outcome and is available before the current call. We used the project's existing training and test split from the UCI Bank Marketing dataset and treated subscription as the positive class.
+
+```{r}
+#| include: false
+#install.packages("tidymodels")
+library(readr)
+library(tidymodels)
+library(knitr)
+```
+
+
+```{r}
+#| include: false
+train_df <- read_csv("data/processed/bank_train.csv")
+```
+
+```{r}
+training_data <- train_df|>
+  select(age, marital, job, education, default, balance, housing, loan, poutcome, y)|>
+  mutate(y = factor(y, levels = c("yes","no")))
+  
+predictor_cols <- c(
+  "age", "marital", "job", "education", "default", "balance",
+  "housing", "loan", "poutcome")
+model_cols <- c(predictor_cols, "y")
+```
+
+
+```{r}
+preprocessor <- recipe(y ~ ., data = training_data) |>
+  step_dummy(marital, job, education, default, housing, loan, poutcome) |>
+  step_normalize(age, balance)
+
+```
+The recipe converts categorical predictors into indicator columns and standardizes age and balance. During cross-validation, the recipe estimates its preprocessing parameters using only the analysis portion of each fold.
+
+### Baseline and logistic regression
+The baseline predicts the most common training class and assigns every client the same probability of subscription, equal to the training subscription rate. Logistic regression is suitable for the binary outcome because it estimates the probability that each client subscribes. We fitted an unpenalized logistic regression using all nine predictors and used a fixed classification threshold of 0.50. 
+
+```{r}
+# baseline
+base_model <- null_model() |>
+  set_engine("parsnip") |>
+  set_mode("classification")
+
+pipe_base <- workflow() |>
+  add_formula(y ~ .) |>
+  add_model(base_model)
+
+```
+
+```{r}
+# logistic regression
+logistic_model <- logistic_reg() |>
+  set_engine("glm") |>
+  set_mode("classification")
+
+pipe_logistic <- workflow() |>
+  add_recipe(preprocessor) |>
+  add_model(logistic_model)
+
+```
+
+
+
+### Stratified five-fold cross-validation
+We used the same five stratified folds for both workflows to keep the subscription rate similar across folds. We recorded accuracy and recall using the models' default class predictions. With `yes` as the first outcome level, recall measures how many actual subscribers each model correctly identified.
+```{r}
+set.seed(522)
+folds <- vfold_cv(training_data, v = 5, strata = y)
+
+set <- metric_set(accuracy, recall)
+
+baseline_cv <- fit_resamples(
+  pipe_base,
+  resamples = folds,
+  metrics = set)
+
+logistic_cv <- fit_resamples(
+  pipe_logistic,
+  resamples = folds,
+  metrics = set)
+
+cv_table <- bind_rows(
+  collect_metrics(baseline_cv) |> mutate(model = "Baseline"),
+  collect_metrics(logistic_cv) |> mutate(model = "Logistic regression")) |>
+  select(model, .metric, mean, std_err) |>
+  mutate(across(c(mean, std_err), ~round(., 4)))
+
+```
+
+### Test-set evaluation
+
+We fitted both models on the full training set and evaluated them on the original test set. We classified a client as a subscriber when the predicted probability was at least 0.50. Accuracy measures the proportion of all clients classified correctly. Recall measures the proportion of actual subscribers identified, which is important when the bank wants to reach potential subscribers. 
+
+```{r}
+baseline_fit <- fit(pipe_base, data = training_data)
+logistic_fit <- fit(pipe_logistic, data = training_data)
+
+test_data <- read_csv("data/processed/bank_test.csv")
+
+baseline_prob <- predict(baseline_fit, test_data, type = "prob")$.pred_yes
+logistic_prob <- predict(logistic_fit, test_data, type = "prob")$.pred_yes
+
+actual_yes <- test_data$y == "yes"
+baseline_yes <- baseline_prob >= 0.50
+logistic_yes <- logistic_prob >= 0.50
+
+scores <- rbind(
+  "Majority-class baseline" = c(
+    accuracy = mean(baseline_yes == actual_yes),
+    recall = mean(baseline_yes[actual_yes])
+  ),
+  "Logistic regression" = c(
+    accuracy = mean(logistic_yes == actual_yes),
+    recall = mean(logistic_yes[actual_yes])
+  )
+)
+```
+
+## Results
+@tbl-bank-cv summarizes accuracy and recall across the five training folds. Logistic regression achieved a mean accuracy of 89.16%, compared with 88.30% for the majority-class baseline. The larger improvement was in recall. On average, logistic regression identified 15.22% of actual subscribers across the folds, while the baseline identified none because it predicted non-subscription for every client.
+
+```{r}
+#| label: tbl-bank-cv
+#| tbl-cap: "Mean accuracy and recall across five stratified cross-validation folds"
+#| echo: false
+
+kable(cv_table,
+      col.names = c("Model", "Metric", "Mean", "Standard error"),
+      digits = 4)
+```
+
+As shown in @tbl-bank-test, logistic regression achieved 89.61% test accuracy, compared with 88.30% for the majority-class baseline. The main improvement was in recall. As shown in @fig-bank-test-recall, logistic regression identified 184 of 1,058 actual subscribers (17.39% recall), while the baseline identified none (0.00% recall).
+
+```{r}
+#| label: tbl-bank-test
+#| tbl-cap: "Test-set accuracy and subscriber recall for the majority-class baseline and logistic regression."
+#| echo: false
+kable(data.frame(
+  Model = rownames(scores),
+  Accuracy = sprintf("%.2f%%", 100 * scores[, "accuracy"]),
+  Recall = sprintf("%.2f%%", 100 * scores[, "recall"]),
+  check.names = FALSE,
+  row.names = NULL
+))
+```
+
+```{r}
+#| label: fig-bank-test-recall
+#| fig-cap: "Test-set recall for the majority-class baseline and logistic regression at the fixed 0.50 classification threshold."
+#| fig-width: 6
+#| fig-height: 3.5
+#| echo: false
+
+recall_plot_data <- data.frame(
+  model = factor(rownames(scores), levels = rev(rownames(scores))),
+  recall_percent = 100 * scores[, "recall"]
+)
+
+ggplot(recall_plot_data, aes(x = recall_percent, y = model)) +
+  geom_col(fill = "blue", width = 0.5) +
+  geom_text(
+    aes(label = sprintf("%.2f%%", recall_percent)),
+    hjust = 0,
+    size = 4
+  ) +
+  scale_x_continuous(
+    breaks = seq(0, 100, by = 20),
+    expand = expansion(mult = c(0, 0.02))
+  ) +
+  coord_cartesian(xlim = c(0, 100)) +
+  labs(x = "Actual subscribers correctly identified(%)", y = NULL) +
+  theme_minimal(base_size = 12)
+```
+
+
+## Discussion
+The logistic regression model identified subscribers that the majority-class baseline would have missed. We expected the baseline to achieve high accuracy because most clients did not subscribe. Its zero recall shows why accuracy alone gives an incomplete prediction when the bank wants to identify potential subscribers.
+
+The recall gain could help the bank build a more targeted call list. However, logistic regression still missed over 80% actual subscribers at the 0.5 threshold. Its value for outreach depends on the cost of those calls and the value of reaching additional subscribers.
