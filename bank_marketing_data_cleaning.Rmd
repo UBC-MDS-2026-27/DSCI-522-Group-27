@@ -1,0 +1,109 @@
+---
+title: "Will a client subscribe to the term deposit?: Data Cleaning"
+subtitle: "UCI Bank Marketing dataset"
+date: "`r Sys.Date()`"
+output:
+  html_document:
+    toc: true
+    toc_float: true
+    number_sections: true
+    df_print: paged
+---
+
+```{r packages}
+library(tidyverse)
+library(rsample)   # stratified train/test split
+
+theme_set(theme_minimal(base_size = 12))
+y_cols <- c(no = "grey65", yes = "#1f77b4")
+```
+
+# Download the data to `data/raw/`
+
+The UCI zip contains two nested zips (`bank.zip` and `bank-additional.zip`). We use `bank-full.csv` (45,211 rows, 16 predictors + `y`), which is inside `bank.zip`. The download is skipped if the file is already present, so re-knitting doesn't hit the server each time.
+
+```{r download}
+data_url <- "https://archive.ics.uci.edu/static/public/222/bank+marketing.zip"
+raw_dir  <- file.path("data", "raw")
+dir.create(raw_dir, recursive = TRUE, showWarnings = FALSE)
+
+zip_path <- file.path(raw_dir, "bank+marketing.zip")
+
+if (!file.exists(zip_path)) {
+  options(timeout = max(300, getOption("timeout")))   # slow connections
+  download.file(data_url, destfile = zip_path, mode = "wb")
+}
+
+# Unzip the outer archive, then the inner bank.zip
+unzip(zip_path, exdir = raw_dir)
+inner_zip <- file.path(raw_dir, "bank.zip")
+if (file.exists(inner_zip)) unzip(inner_zip, exdir = raw_dir)
+
+raw_csv <- list.files(raw_dir, pattern = "^bank-full\\.csv$",
+                      recursive = TRUE, full.names = TRUE)[1]
+stopifnot("bank-full.csv not found after unzipping" = !is.na(raw_csv))
+
+raw_csv
+list.files(raw_dir, recursive = TRUE)
+```
+
+# Wrangle and clean, saving to `data/processed/`
+
+The raw file is **semicolon-delimited**. Cleaning steps:
+
+1.  Read with the correct delimiter.
+2.  Convert text columns to factors, with `y` levelled `no`/`yes` and `month` in calendar order.
+3.  Keep `"unknown"` as its own factor level. Whether it is informative is checked in the EDA, and any imputation happens later, after the split.
+
+## Read raw data
+
+```{r read-raw}
+bank_raw <- read_delim(raw_csv, delim = ";", show_col_types = FALSE)
+```
+
+## Convert text columns to factors
+
+```{r clean}
+month_levels <- c("jan", "feb", "mar", "apr", "may", "jun",
+                  "jul", "aug", "sep", "oct", "nov", "dec")
+
+bank_clean <- bank_raw |>
+  mutate(
+    across(where(is.character), as.factor),
+    y      = factor(y, levels = c("no", "yes")),
+    month  = factor(month, levels = month_levels)
+  ) 
+
+# Sanity checks
+stopifnot(nrow(bank_clean) == nrow(bank_raw),
+          !anyNA(bank_clean$y),
+          all(!is.na(bank_clean$month)))
+
+```
+
+## Save clean data
+
+```{r save-processed}
+processed_dir <- file.path("data", "processed")
+dir.create(processed_dir, recursive = TRUE, showWarnings = FALSE)
+
+write_csv(bank_clean, file.path(processed_dir, "bank_clean.csv"))
+```
+
+# Split into training and test sets
+
+The split happens **before** any EDA or preprocessing, so nothing we learn from the data is influenced by the test set. Because `y` is imbalanced, the split is **stratified on `y`**, which keeps the yes/no proportion the same in both sets. A seed makes it reproducible.
+
+```{r split}
+set.seed(522) 
+bank_split <- initial_split(bank_clean, prop = 0.8, strata = y) 
+bank_train <- training(bank_split) 
+bank_test <- testing(bank_split)
+
+write_csv(bank_train, file.path(processed_dir, "bank_train.csv")) 
+write_csv(bank_test, file.path(processed_dir, "bank_test.csv"))
+
+tibble(set = c("train", "test"), 
+       n = c(nrow(bank_train), nrow(bank_test)), 
+       yes_rate = c(mean(bank_train$y == "yes"), mean(bank_test$y == "yes")))
+```
