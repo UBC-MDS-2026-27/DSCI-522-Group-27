@@ -98,7 +98,7 @@ stopifnot(nrow(bank_clean) == nrow(bank_raw),
           all(!is.na(bank_clean$month)))
 
 # Saving cleaned data
-processed_dir <- file.path("...", "data", "processed")
+processed_dir <- file.path("..", "data", "processed")
 dir.create(processed_dir, recursive = TRUE, showWarnings = FALSE)
 
 write_csv(bank_clean, file.path(processed_dir, "bank_clean.csv"))
