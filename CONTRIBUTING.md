@@ -69,6 +69,12 @@ To re-run the analysis, render the Quarto report from the project root:
 quarto render analysis/bank-term-deposit-prediction.qmd
 ```
 
+If you are already in the `analysis/` directory, run:
+
+```bash
+quarto render bank-term-deposit-prediction.qmd
+```
+
 This downloads and cleans the data (if it is not already in `data/raw/`) and
 runs the full analysis.
 

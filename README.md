@@ -26,7 +26,7 @@ The source is [`analysis/bank-term-deposit-prediction.qmd`](analysis/bank-term-d
 ## Usage
 
 These steps work on macOS and Windows. Run every command from the root of
-the repository (the `DSCI-522-Group-27` folder).
+the repository (the `DSCI-522-Group-27` folder) unless otherwise noted.
 
 ### 1. Install the required software
 
@@ -70,6 +70,12 @@ Quit R (`q()`), then in the terminal run:
 
 ```bash
 quarto render analysis/bank-term-deposit-prediction.qmd
+```
+
+If you are already in the `analysis/` directory, run:
+
+```bash
+quarto render bank-term-deposit-prediction.qmd
 ```
 
 This needs an internet connection the first time. It downloads the data from
