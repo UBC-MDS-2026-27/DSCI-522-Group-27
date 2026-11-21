@@ -56,7 +56,7 @@ We divided the explanatory variables used in this analysis into three groups, sh
 # The download is skipped if the file is already present, so re-knitting doesn't
 # hit the server each time.
 data_url <- "https://archive.ics.uci.edu/static/public/222/bank+marketing.zip"
-raw_dir  <- file.path("data", "raw")
+raw_dir  <- file.path("..", "data", "raw")
 dir.create(raw_dir, recursive = TRUE, showWarnings = FALSE)
 
 zip_path <- file.path(raw_dir, "bank+marketing.zip")
