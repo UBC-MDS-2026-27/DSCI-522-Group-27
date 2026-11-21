@@ -49,7 +49,7 @@ We divided the explanatory variables used in this analysis into three groups, sh
 | Financial health | Credit default, average yearly account balance (euros), housing loan, personal loan |
 | Previous decision | Outcome of the previous marketing campaign (success, failure, other or unknown) |
 
-: Explanatory variables used in this analysis, grouped by type.
+: Explanatory variables used in this analysis, grouped by type. {#tbl-variables}
 
 ```{r}
 # Downloading raw data
@@ -66,10 +66,12 @@ if (!file.exists(zip_path)) {
   download.file(data_url, destfile = zip_path, mode = "wb")
 }
 
-# Unzip the outer archive, then the inner bank.zip
-unzip(zip_path, exdir = raw_dir)
-inner_zip <- file.path(raw_dir, "bank.zip")
-if (file.exists(inner_zip)) unzip(inner_zip, exdir = raw_dir)
+# Unzip the outer archive, then the inner bank.zip (skipped if already extracted)
+if (!file.exists(file.path(raw_dir, "bank-full.csv"))) {
+  unzip(zip_path, exdir = raw_dir)
+  inner_zip <- file.path(raw_dir, "bank.zip")
+  if (file.exists(inner_zip)) unzip(inner_zip, exdir = raw_dir)
+}
 
 raw_csv <- list.files(raw_dir, pattern = "^bank-full\\.csv$",
                       recursive = TRUE, full.names = TRUE)[1]
@@ -96,7 +98,7 @@ stopifnot(nrow(bank_clean) == nrow(bank_raw),
           all(!is.na(bank_clean$month)))
 
 # Saving cleaned data
-processed_dir <- file.path("data", "processed")
+processed_dir <- file.path("...", "data", "processed")
 dir.create(processed_dir, recursive = TRUE, showWarnings = FALSE)
 
 write_csv(bank_clean, file.path(processed_dir, "bank_clean.csv"))
@@ -700,7 +702,7 @@ cm_test
 #autoplot(cm_test, type = "heatmap") 
 ```
 
-While there is promise in this model as a tool to build a more targeted call list to match clients with term deposits, it still requires more work. The logistic regression model did show that information available before a marketing call can help identify clients who are likely to subscribe to a term deposit. However, even using a threshold of 0.15 to maximize the F1 score, recall was only 44.61%, meaning the model still missed 55.39% of the clients who would have invested in term deposits. While tuning on a slightly finer grid may help to improve our score metrics, it is likely our predictor variables are may not be carrying a strong enough signal. Logistic regression assumes that age and account balance have linear relationships with the log-odds of subscription and that predictor effects are additive on the log-odds scale. These assumptions may miss nonlinear patterns or interactions among client characteristics.
+While there is promise in this model as a tool to build a more targeted call list to match clients with term deposits, it still requires more work. The logistic regression model did show that information available before a marketing call can help identify clients who are likely to subscribe to a term deposit. However, even using a threshold of 0.15 to maximize the F1 score, recall was only 44.61%, meaning the model still missed 55.39% of the clients who would have invested in term deposits. While tuning on a slightly finer grid may help to improve our score metrics, it is likely our predictor variables may not be carrying a strong enough signal. Logistic regression assumes that age and account balance have linear relationships with the log-odds of subscription and that predictor effects are additive on the log-odds scale. These assumptions may miss nonlinear patterns or interactions among client characteristics.
 
 Additionally, we evaluated the model on one test split, so its performance may differ in later campaigns. The data source (Moro et al., 2014) is also limited to Portugeuse banking clients from the period of 2008-2013. This specific time and location sample, which includes the 2008 Financial Crisis, may affect applicability to other countries and/or time periods.
 
@@ -770,6 +772,8 @@ Moro, S., Cortez, P., & Rita, P. (2014). A data-driven approach to predict the s
 Moro, S., Laureano, R., & Cortez, P. (2011). Using data mining for bank direct marketing: An application of the CRISP-DM methodology. In P. Novais et al. (Eds.), *Proceedings of the European Simulation and Modelling Conference (ESM'2011)* (pp. 117–121). EUROSIS. <http://hdl.handle.net/1822/14838>
 
 Moro, S., Rita, P., & Cortez, P. (2014). *Bank marketing* \[Data set\]. UCI Machine Learning Repository. <https://doi.org/10.24432/C5K306>
+
+Prasad, R., Choubey, M., Baghel, R. K., & Naruka, A. (2025). *Term deposit customer prediction: A blending approach using bank marketing data.* 2025 IEEE International Students’ Conference on Electrical, Electronics and Computer Science (SCEECS). <https://doi.org/10.1109/SCEECS64059.2025.10940622>
 
 R Core Team. (2026). *R: A language and environment for statistical computing* (Version 4.6.1) \[Computer software\]. R Foundation for Statistical Computing. <https://www.R-project.org/>
 
