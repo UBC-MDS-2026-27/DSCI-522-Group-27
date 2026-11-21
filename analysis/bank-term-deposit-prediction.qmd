@@ -1,5 +1,5 @@
 ---
-title: "Exploratory Data Analysis: Demographic and Financial Health Variables"
+title: "Predicting Bank Term Deposit Subscription"
 format:
   html:
     embed-resources: true
@@ -10,7 +10,7 @@ date: "2026-11-19"
 knitr::opts_chunk$set(echo = TRUE, message = FALSE, warning = FALSE)
 ```
 
-## Overview
+# Overview
 
 We explore demographic (age, marital, job, education) and financial health (default, balance, housing, loan) variables against term deposit subscription, using the training split only.
 
@@ -44,7 +44,7 @@ bank_df |>
 
 The target is imbalanced: only about 12% of clients subscribed.
 
-# Part 1: Demographic variables
+## Part 1: Demographic variables
 
 ```{r}
 #### Filter the columns age, marital, job, education and the target column y
@@ -54,7 +54,7 @@ bank_demo_df <- bank_df |> select(age, marital, job, education, y) |>
 head(bank_demo_df)
 ```
 
-## Age
+### Age
 
 ```{r}
 #### AGE
@@ -139,7 +139,7 @@ bank_demo_df |>
 
 Subscription is U-shaped by age: about 25% for ages 25 or younger, 9% for ages 36-55, and 43% for ages over 65.
 
-## Marital status
+### Marital status
 
 ```{r}
 #### MARITAL
@@ -168,7 +168,7 @@ ggplot(bank_demo_df, aes(x = marital, fill = is_deposit)) +
 
 Most clients are married (60%). Single clients subscribed most (15%) and married least (10%).
 
-## Job
+### Job
 
 ```{r}
 #### JOB
@@ -205,7 +205,7 @@ ggplot(bank_demo_df, aes(y = factor(job, levels = job_order), fill = is_deposit)
 
 Students (29%) and retirees (23%) subscribed most; blue-collar workers (7%) least.
 
-## Education
+### Education
 
 ```{r}
 #### EDUCATION
@@ -236,7 +236,7 @@ ggplot(bank_demo_df,
 
 Subscription rises with education: 9% (primary), 11% (secondary), 15% (tertiary).
 
-# Part 2: Financial health variables
+## Part 2: Financial health variables
 
 ```{r}
 #### Filter the columns default, balance, housing, loan and the target columns of y
@@ -246,7 +246,7 @@ bank_fin_df <- bank_df |> select(default, balance, housing, loan, y) |>
 head(bank_fin_df)
 ```
 
-## Credit default
+### Credit default
 
 ```{r}
 #### DEFAULT
@@ -275,7 +275,7 @@ ggplot(bank_fin_df, aes(x = default, fill = is_deposit)) +
 
 Under 2% of clients are in default; they subscribed at 6% vs 12% for others.
 
-## Housing loan
+### Housing loan
 
 ```{r}
 #### HOUSING LOAN
@@ -304,7 +304,7 @@ ggplot(bank_fin_df, aes(x = housing, fill = is_deposit)) +
 
 Clients without a housing loan subscribed at 17%, over twice the rate of those with one (8%).
 
-## Personal loan
+### Personal loan
 
 ```{r}
 #### PERSONAL LOAN
@@ -333,7 +333,7 @@ ggplot(bank_fin_df, aes(x = loan, fill = is_deposit)) +
 
 Clients with a personal loan subscribed at 7% vs 13% for those without.
 
-## Combined loan burden
+### Combined loan burden
 
 ```{r}
 #### ANY LOAN (housing or personal)
@@ -362,7 +362,7 @@ bank_fin_df |>
 
 Clients with no loans subscribed at 18% vs 8% for those with at least one.
 
-## Account balance
+### Account balance
 
 ```{r}
 #### BALANCE
@@ -445,22 +445,27 @@ bank_fin_df |>
 
 Clients in default have a median balance of -5 euros, so credit default and account balance overlap.
 
-# Summary of findings
+## Summary of findings
 
 - **Demographics:** age (U-shaped) and job show the biggest differences; education and marital status matter less.
 - **Financial health:** having any loan or a default is associated with lower subscription; higher balance is associated with slightly higher subscription.
 
-## Method
+# Method
 
 - @ANH add in the analysis of the variables here, and tie the writing in with the paragraph below in preprocessing.
 
-### Preprocessing
+**new added**
+We used logistic regression to predict whether a client would subscribe to a term deposit. The outcome is binary, and logistic regression estimates a subscription probability for each client. These probabilities allow the bank to rank clients for outreach, while the model coefficients help explain how each predictor is associated with subscription when the other predictors are held fixed. Because only a small proportion of clients subscribed, the default classification threshold of 0.50 can miss many actual subscribers. Lowering the threshold can identify more subscribers, but it can also flag more clients who do not subscribe. We therefore used stratified five-fold cross-validation on the training set to examine how different thresholds affect precision, recall, and F1. The following sections describe how we preprocessed the predictors, fitted the model, compared candidate thresholds, and evaluated the final model on the held-out test set.
 
-We evaluated whether eight client characteristics and the previous marketing campaign outcome could predict term deposit subscription more effectively than a majority-class baseline. The client characteristics were age, marital status, occupation, education, credit default, average yearly account balance, housing loan, and personal loan. The ninth predictor, `poutcome`, records the previous campaign outcome and is available before the current call. We used the project's existing training and test split from the UCI Bank Marketing dataset and treated subscription as the positive class.
+## Preprocessing
+
+We used nine predictors available before the current marketing call: age, marital status, occupation, education, credit default, average yearly account balance, housing loan status, personal loan status, and the outcome of the previous marketing campaign. We kept the existing training and test split and treated subscription as the positive class.
+
+We converted categorical predictors to indicator variables and standardized age and account balance. During cross-validation, we estimated these transformations using only the training portion of each fold and applied them to that fold’s validation data. For the final evaluation, we estimated the transformations on the full training set and applied them to the test set.
 
 ## Jonah additions below:
 
-We chose to use a classification model using a Logistic Regression with all nine predictors. To predict whether a client would accept the term deposit, we used 5-fold cross validation to select the classification threshold that maximized mean F1. We checked across a range of possible thresholds below 0.5 due to the heavily imbalanced classes in our dataset. We found that a threshold of 0.15 was optimal among the thresholds tested. Because the threshold was selected using only training-data folds, the test set gives an unbiased estimate of performance.
+We chose to use a classification model using a Logistic Regression with all nine predictors. To predict whether a client would accept the term deposit, We compared ten classification thresholds using stratified five-fold cross-validation. We retained 0.15 because it achieved higher recall than 0.20, with a similar mean F1 score. We checked across a range of possible thresholds below 0.5 due to the heavily imbalanced classes in our dataset. We found that a threshold of 0.15 was optimal among the thresholds tested. Because the threshold was selected using only training-data folds, the test set gives an unbiased estimate of performance.
 
 ```{r}
 #| include: false
@@ -519,9 +524,13 @@ threshold_full <- map(thresholds, \(t) {
   list_rbind()
 ```
 
-Table (x). The 10 thresholds, ranked according to highest mean F1 score. The table shows the mean F1, precision, recall, and accuracy scores.
+@tbl-bank-thresholds compares the mean F1, precision, recall, and accuracy across the five cross-validation folds for each candidate threshold.
 
 ```{r}
+#| label: tbl-bank-thresholds
+#| tbl-cap: "Mean cross-validation scores for the ten candidate classification thresholds, ranked by F1."
+#| echo: false
+
 threshold_full |>
   pivot_wider(names_from = .metric, values_from = mean) |>
   arrange(desc(f_meas)) |>
@@ -533,6 +542,11 @@ threshold_full |>
   mutate(across(-Threshold, \(x) 100 * x)) |>
   knitr::kable(digits = 2, align = "c")
 ```
+
+
+## Test-set evaluation
+
+We refitted the logistic regression model on the full training set and evaluated it on the original test set. We classified clients as predicted subscribers when their estimated probability was at least 0.15. We report accuracy for overall classification performance, precision for the share of predicted subscribers who actually subscribed, and recall for the share of actual subscribers the model identified. The F1 score summarizes precision and recall.
 
 ```{r}
 # Test data evaluation
@@ -560,7 +574,7 @@ scores <- rbind(
 )
 ```
 
-Table \[y\]. F1, Precision, Recall, and Accuracy of the final model on the test data.
+@tbl-bank-test summarizes the test-set accuracy, precision, recall, and F1 score at the 0.15 classification threshold.
 
 ```{r}
 #| label: tbl-bank-test
@@ -578,9 +592,7 @@ kable(data.frame(
 ))
 ```
 
-Test performance was consistent with cross-validation (F1 35.07% vs. 35.56%), suggesting the model did not overfit (Tables x and y). However, the model is still miscategorizing many clients. The confusion matrix (Table Z) shows that the model has more false negatives than true positives. A false negative means a likely subscriber is never called, so the bank loses a sale and the client misses a product that suited them.Additionally, the model also has a large number of false positives, which may be harmful to the bank if resources are scarce and efficient allocation is needed.
-
-Table Z. The confusion matrix of model performance on test data at the 0.15 threshold level. Rows are the predictions, while columns are the true class.
+Test performance was consistent with cross-validation (F1 35.07% vs. 35.56%), suggesting the model did not overfit (@tbl-bank-thresholds and @tbl-bank-test). However, the model is still miscategorizing many clients. The confusion matrix shows that the model has more false negatives than true positives. A false negative means a likely subscriber is never called, so the bank loses a sale and the client misses a product that suited them.Additionally, the model also has a large number of false positives, which may be harmful to the bank if resources are scarce and efficient allocation is needed.
 
 ```{r}
 test_preds_class <- tibble(
@@ -591,7 +603,7 @@ test_preds_class <- tibble(
 
 cm_test <- conf_mat(test_preds_class, truth = y, estimate = .pred_class)
 cm_test
-autoplot(cm_test, type = "heatmap")
+#autoplot(cm_test, type = "heatmap") 
 ```
 
 While there is promise in this model as a tool to build a more targeted call list to match clients with term deposits, it still requires more work. The logistic regression model did show that information available before a marketing call can help identify clients who are likely to subscribe to a term deposit. However, even using a threshold of 0.15 to maximize the F1 score, recall was only 44.61%, meaning the model still missed 55.39% of the clients who would have invested in term deposits. While tuning on a slightly finer grid may help to improve our score metrics, it is likely our predictor variables are may not be carrying a strong enough signal. Logistic regression assumes that age and account balance have linear relationships with the log-odds of subscription and that predictor effects are additive on the log-odds scale. These assumptions may miss nonlinear patterns or interactions among client characteristics.
@@ -600,61 +612,9 @@ Additionally, we evaluated the model on one test split, so its performance may d
 
 A follow-up study could evaluate the model on a later campaign and ask how many subscribers it identifies when the bank can contact only a fixed number of clients.
 
-**OLD below:**
+# Results
 
-### Stratified five-fold cross-validation
-
-Logistic regression is suitable for the binary outcome because it estimates the probability that each client subscribes. We fitted an unpenalized logistic regression using all nine predictors and used a fixed classification threshold of 0.50.
-
-We used the same five stratified folds for both workflows to keep the subscription rate similar across folds. We recorded accuracy and recall using the models' default class predictions. With `yes` as the first outcome level, recall measures how many actual subscribers each model correctly identified.
-
-```{r}
-# Confusion matrix from CV predictions at the chosen threshold
-chosen_threshold <- 0.50
-
-cv_preds_class <- preds |>
-  mutate(.pred_class = factor(if_else(.pred_yes >= chosen_threshold, "yes", "no"),
-                              levels = c("yes", "no")))
-
-cm_cv <- conf_mat(cv_preds_class, truth = y, estimate = .pred_class)
-cm_cv
-autoplot(cm_cv, type = "heatmap")
-summary(cm_cv)   # accuracy, precision, recall, F1, etc. in one table
-```
-
-### Test-set evaluation
-
-We fitted both models on the full training set and evaluated them on the original test set. We classified a client as a subscriber when the predicted probability was at least 0.50. Accuracy measures the proportion of all clients classified correctly. Recall measures the proportion of actual subscribers identified, which is important when the bank wants to reach potential subscribers.
-
-```{r}
-
-logistic_fit <- fit(pipe_logistic, data = training_data)
-
-test_data <- read_csv("../data/processed/bank_test.csv")
-
-logistic_prob <- predict(logistic_fit, test_data, type = "prob")$.pred_yes
-
-actual_yes <- test_data$y == "yes"
-logistic_yes <- logistic_prob >= 0.15
-
-precision <- mean(actual_yes[logistic_yes])
-recall <- mean(logistic_yes[actual_yes])
-
-scores <- rbind(
-  "Logistic regression" = c(
-    accuracy = mean(logistic_yes == actual_yes),
-    precision = precision,
-    recall = recall,
-    f1 = 2 * precision * recall / (precision + recall)
-  )
-)
-```
-
-## Results
-
-@tbl-bank-cv summarizes accuracy and recall across the five training folds. Logistic regression achieved a mean accuracy of 89.16%, compared with 88.30% for the majority-class baseline. The larger improvement was in recall. On average, logistic regression identified 15.22% of actual subscribers across the folds, while the baseline identified none because it predicted non-subscription for every client.
-
-As shown in @tbl-bank-test, logistic regression achieved 89.61% test accuracy, compared with 88.30% for the majority-class baseline. The main improvement was in recall. As shown in @fig-bank-test-recall, logistic regression identified 184 of 1,058 actual subscribers (17.39% recall), while the baseline identified none (0.00% recall).
+As shown in @fig-bank-test-metrics, logistic regression achieved 80.67% accuracy and an F1 score of 35.07% on the test set at the 0.15 classification threshold. The model identified 472 of the 1,058 clients who subscribed, yielding a recall of 44.61%. Of the 1,634 clients predicted to subscribe, 472 actually did, yielding a precision of 28.89%.
 
 ```{r}
 #| label: fig-bank-test-metrics
@@ -687,10 +647,26 @@ ggplot(metric_plot_data, aes(x = percent, y = metric)) +
   theme_minimal(base_size = 12)
 ```
 
-## Discussion
+The confusion matrix in @fig-bank-test-confusion shows how the errors were distributed. The model missed 586 actual subscribers and incorrectly predicted subscription for 1,162 non-subscribers. It correctly classified 6,823 of the 7,985 non-subscribers. Overall, the model correctly identified a substantially larger share of non-subscribers than subscribers.
+```{r}
+#| label: fig-bank-test-confusion
+#| fig-cap: "Test-set confusion matrix for logistic regression at the 0.15 classification threshold. Rows show predicted outcomes and columns show actual outcomes."
+#| echo: false
 
-The logistic regression model showed that information available before a marketing call can help identify clients who are likely to subscribe to a term deposit. On the test set, the model achieved 89.61% accuracy and identified 184 of the 1,058 actual subscribers (17.39% recall). The majority-class baseline achieved 88.30% accuracy and identified no subscribers. We expected the baseline to achieve high accuracy because most clients did not subscribe. Its zero recall shows why accuracy alone gives an incomplete picture when the bank's goal is to reach potential subscribers.
+autoplot(cm_test, type = "heatmap")
+```
 
-The improvement in recall could help the bank build a more targeted call list. At the fixed 0.50 threshold, however, the model still missed 874 of the 1,058 actual subscribers. Its practical value depends on how many calls the bank can make, the cost of those calls, and the value of reaching additional subscribers.
+At the 0.15 threshold, the model flagged 1,634 of the 9,043 test-set clients (18.1%). This group contained 44.6% of all actual subscribers. The observed subscription rate among flagged clients was 28.89%, about 2.5 times the overall test-set rate of 11.70%. Thus, actual subscribers were more concentrated in the group flagged by the model.
 
-Logistic regression assumes that age and account balance have linear relationships with the log-odds of subscription and that predictor effects are additive on the log-odds scale. These assumptions may miss nonlinear patterns or interactions among client characteristics. We evaluated the model on one test split, so its performance may differ in later campaigns. A follow-up study could evaluate the model on a later campaign and ask how many subscribers it identifies when the bank can contact only a fixed number of clients.
+# Discussion
+
+Our results suggest that information available before a marketing call can help identify clients who are likely to subscribe to a term deposit. At the classification threshold of 0.15, logistic regression achieved an F1 score of 35.07%, with 28.89% precision, 44.61% recall, and 80.67% accuracy on the test set. The model identified 472 of the 1,058 actual subscribers and missed 586. We expected accuracy to give an incomplete picture because most clients did not subscribe. Recall shows how many subscribers the model found, while precision shows how many clients on its proposed call list ultimately subscribed.
+
+The model flagged 1,634 clients for outreach, which 1,162 of them did not subscribe. In practical terms, about 29 out of every 100 clients on the proposed list subscribed. This illustrates the decision the bank faces. A longer call list may reach more potential subscribers, but it also takes more time and increases the number of calls to clients who do not subscribe. The value of the model therefore depends on the bank's call budget and the value of reaching additional subscribers.
+
+Prasad et al. (2025) compared several classifiers for the same prediction task. Their blending model had the highest reported accuracy in their comparison (90.5%), with 74.59% precision and 23.62% recall. Our logistic regression had higher observed recall and lower observed precision. These figures provide context for the different priorities a bank might have when building a call list. The studies used different data and predictors, so a direct model comparison would require evaluating both approaches on the same test set with the same pre-call information.
+
+Logistic regression assumes that the effects of predictors are additive on the log-odds scale and that age and account balance enter as linear terms on that scale. This may limit its ability to capture patterns such as the U-shaped relationship between age and subscription rate observed in the training data. We also evaluated the model on a single test split, so performance may differ in later campaigns. Overall, logistic regression provides a starting point for prioritizing outreach, although it still misses more than half of actual subscribers. A follow-up study could compare logistic regression with a model on a later campaign and measure how many subscribers each model identifies under the same call budget.
+
+# Reference
+Prasad, R., Choubey, M., Baghel, R. K., & Naruka, A. (2025). Term deposit customer prediction: A blending approach using bank marketing data. 2025 IEEE International Students’ Conference on Electrical, Electronics and Computer Science (SCEECS). https://doi.org/10.1109/SCEECS64059.2025.10940622
