@@ -8,13 +8,7 @@
 
 ## Summary
 
-Only a small share of bank clients contacted through phone sales agree to
-subscribe to a term deposit. In our data, about 12% of contacted clients
-subscribed, and every unsuccessful call costs the bank money and staff time.
-In this project we ask whether information that is known before a call (a
-client's demographic characteristics, financial health and the outcome of the
-previous campaign) can predict whether the client will subscribe, so that the
-bank can target likely subscribers instead of mass calling.
+Only a small share of bank clients contacted through phone sales agree to subscribe to a term deposit. In our data, about 12% of contacted clients subscribed, and every unsuccessful call costs the bank money and staff time. In this project we ask whether information that is known before a call (a client's demographic characteristics, financial health and the outcome of the previous campaign) can predict whether the client will subscribe, so that the bank can target likely subscribers instead of mass calling.
 
 We trained a logistic regression model on the UCI Bank Marketing dataset (Moro et al., 2014) and tuned its classification threshold with five-fold cross-validation. At the chosen threshold of 0.15, the model correctly identified 472 of the 1,058 actual subscribers in the test set (44.61% recall, 28.89% precision, F1 score of 35.07%). This suggests that pre-call information carries some useful signal, but the model still misses more than half of the subscribers, so further work is needed before it could guide real campaigns.
 
