@@ -11,93 +11,6 @@ date: "2026-11-19"
 knitr::opts_chunk$set(echo = TRUE, message = FALSE, warning = FALSE)
 ```
 
-
-# Summary
-
-Only a small share of clients contacted through phone sales agree to subscribe
-to a term deposit: in our data, about 12% of contacted clients subscribed.
-Because every call costs the bank money and staff time, this makes phone
-marketing costly. In this project we aim to improve the efficiency of this type
-of marketing by asking whether information available before a call (a client's
-demographic characteristics, financial health and the outcome of the previous
-campaign) can predict whether the client will subscribe. We trained a logistic
-regression model on the UCI Bank Marketing dataset (Moro, Rita, et al., 2014). On the
-test set, the model reached 89.61% accuracy and correctly identified 184 of the
-1,058 actual subscribers (17.39% recall). These results suggest that pre-call
-information carries some useful signal, but at the default 0.50 classification
-threshold the model still missed most subscribers. The model also assumes linear
-relationships, which may miss patterns such as the U-shaped relationship between
-age and subscription, and it was evaluated on a single test split, so its
-performance in future campaigns may differ.
-
-# Introduction
-
-A term deposit is a savings product in which a client places money with a bank
-for a fixed period in exchange for a fixed interest rate. The Bank Marketing
-dataset records direct marketing campaigns in which a Portuguese bank promoted
-term deposits to its clients through phone calls, often contacting the same
-client more than once (Moro et al., 2011; Moro, Rita, et al., 2014). In this data, only about
-12% of contacted clients subscribed.
-
-This low success rate makes mass calling inefficient. Every unsuccessful call
-costs the bank money and uses staff time that could be spent on clients who are
-more likely to be interested. Repeated calls to clients who do not want the
-product can also frustrate them and harm customer satisfaction. Predicting which
-clients are likely to accept a term deposit would allow the bank to better match
-clients with the banking products they need, increasing client satisfaction,
-financial security and banking profits. Previous work on this dataset has shown
-that data mining models can help predict the success of bank telemarketing calls
-(Moro et al., 2011; Moro, Cortez, et al., 2014).
-
-In this project we ask: **can a client's demographic characteristics, financial
-health and previous campaign outcome, all known before a marketing call, be used
-to predict whether the client will subscribe to a term deposit, so that the bank
-can target likely subscribers instead of mass calling?** We focus only on
-information known before the call, rather than details of the call itself such
-as its duration, because the bank needs to decide whom to call before making the
-call.
-
-# Methods
-
-## Data
-
-We used the Bank Marketing dataset created by Moro, Rita, et al. (2014) and made
-available through the UCI Machine Learning Repository under a Creative Commons
-Attribution 4.0 (CC BY 4.0) license. The data comes from phone-based direct
-marketing campaigns run by a Portuguese bank between May 2008 and November 2010
-(Moro et al., 2011). We used the full version of the data, which contains 45,211 rows.
-Each row represents one client contacted during a campaign and includes 16
-explanatory variables and a binary target recording whether the client
-subscribed to a term deposit ("yes" or "no"). The dataset has no blank missing
-values. Unknown values are instead recorded as an "unknown" category, which we
-kept as its own level (Moro, Rita, et al., 2014).
-
-We divided the explanatory variables used in this analysis into three groups,
-shown in @tbl-variables. We did not use the remaining seven variables. Most of
-them describe the contact made during the current campaign, such as the call
-duration, which is only known after the call has taken place.
-
-| Group | Variables |
-|-------|-----------|
-| Demographic | Age (years), marital status (married, single or divorced, where divorced also includes widowed), job type, education level |
-| Financial health | Credit default, average yearly account balance (euros), housing loan, personal loan |
-| Previous decision | Outcome of the previous marketing campaign (success, failure, other or unknown) |
-
-: Explanatory variables used in this analysis, grouped by type. {#tbl-variables}
-
-Before any exploration or modelling, the data was split into a training set
-(80%, 36,168 clients) and a test set (20%, 9,043 clients), so that the test set
-did not influence any of our decisions. The analysis was carried out in R
-(R Core Team, 2026) using the tidyverse (Wickham et al., 2019) for data wrangling
-and visualization and tidymodels (Kuhn & Wickham, 2020) for modelling.
-
-## Exploratory data analysis
-
-To understand how each variable relates to subscription before modelling, we
-explored the demographic and financial health variables in the training set. For
-each variable, we compared its distribution and the term deposit subscription
-rate across its values.
-
 ```{r}
 set.seed(522)
 #### Load libraries
@@ -107,7 +20,113 @@ library(ggplot2)
 library(readr)
 library(tidymodels)
 library(knitr)
+library(rsample)
 ```
+
+# Summary
+
+Only a small share of clients contacted through phone sales agree to subscribe to a term deposit: in our data, about 12% of contacted clients subscribed. Because every call costs the bank money and staff time, this makes phone marketing costly. In this project we aim to improve the efficiency of this type of marketing by asking whether information available before a call (a client's demographic characteristics, financial health and the outcome of the previous campaign) can predict whether the client will subscribe. We trained a logistic regression model on the UCI Bank Marketing dataset (Moro, Rita, et al., 2014). On the test set, the model had an F1 of 0.3507 and correctly identified 472 of the 1,058 actual subscribers. These results suggest that pre-call information carries some useful signal, but at the tuned 0.15 classification threshold the model still missed most subscribers. The model also assumes linear relationships, which may miss patterns such as the U-shaped relationship between age and subscription, and it was evaluated on a single test split, so its performance in future campaigns may differ.
+
+# Introduction
+
+A term deposit is a savings product in which a client places money with a bank for a fixed period in exchange for a fixed interest rate. The Bank Marketing dataset records direct marketing campaigns in which a Portuguese bank promoted term deposits to its clients through phone calls, often contacting the same client more than once (Moro et al., 2011; Moro, Rita, et al., 2014). In this data, only about 12% of contacted clients subscribed.
+
+This low success rate makes mass calling inefficient. Every unsuccessful call costs the bank money and uses staff time that could be spent on clients who are more likely to be interested. Repeated calls to clients who do not want the product can also frustrate them and harm customer satisfaction. And missing customers who are likely to accept costs the bank profits. Predicting which clients are likely to accept a term deposit would allow the bank to better match clients with the banking products they need, increasing client satisfaction, financial security and banking profits. Previous work on this dataset has shown that data mining models can help predict the success of bank telemarketing calls (Moro et al., 2011; Moro, Cortez, et al., 2014).
+
+In this project we ask: **can a client's demographic characteristics, financial health and previous campaign outcome, all known before a marketing call, be used to predict whether the client will subscribe to a term deposit, so that the bank can target likely subscribers instead of mass calling?** We focus only on information known before the call, rather than details of the call itself such as its duration, because the bank needs to decide whom to call before making the call.
+
+# Methods
+
+## Data
+
+We used the Bank Marketing dataset created by Moro, Rita, et al. (2014) and made available through the UCI Machine Learning Repository under a Creative Commons Attribution 4.0 (CC BY 4.0) license. The data comes from phone-based direct marketing campaigns run by a Portuguese bank between May 2008 and November 2010 (Moro et al., 2011). We used the full version of the data, which contains 45,211 rows. Each row represents one client contacted during a campaign and includes 16 explanatory variables and a binary target recording whether the client subscribed to a term deposit ("yes" or "no"). The dataset has no blank missing values. Unknown values are instead recorded as an "unknown" category, which we kept as its own level (Moro, Rita, et al., 2014).
+
+We divided the explanatory variables used in this analysis into three groups, shown in @tbl-variables. We did not use the remaining seven variables. Most of them describe the contact made during the current campaign, such as the call duration, which is only known after the call has taken place.
+
+| Group | Variables |
+|----------------------------|--------------------------------------------|
+| Demographic | Age (years), marital status (married, single or divorced, where divorced also includes widowed), job type, education level |
+| Financial health | Credit default, average yearly account balance (euros), housing loan, personal loan |
+| Previous decision | Outcome of the previous marketing campaign (success, failure, other or unknown) |
+
+: Explanatory variables used in this analysis, grouped by type.
+
+```{r}
+# Downloading raw data
+# The download is skipped if the file is already present, so re-knitting doesn't
+# hit the server each time.
+data_url <- "https://archive.ics.uci.edu/static/public/222/bank+marketing.zip"
+raw_dir  <- file.path("data", "raw")
+dir.create(raw_dir, recursive = TRUE, showWarnings = FALSE)
+
+zip_path <- file.path(raw_dir, "bank+marketing.zip")
+
+if (!file.exists(zip_path)) {
+  options(timeout = max(300, getOption("timeout")))   # slow connections
+  download.file(data_url, destfile = zip_path, mode = "wb")
+}
+
+# Unzip the outer archive, then the inner bank.zip
+unzip(zip_path, exdir = raw_dir)
+inner_zip <- file.path(raw_dir, "bank.zip")
+if (file.exists(inner_zip)) unzip(inner_zip, exdir = raw_dir)
+
+raw_csv <- list.files(raw_dir, pattern = "^bank-full\\.csv$",
+                      recursive = TRUE, full.names = TRUE)[1]
+stopifnot("bank-full.csv not found after unzipping" = !is.na(raw_csv))
+
+raw_csv
+list.files(raw_dir, recursive = TRUE)
+
+bank_raw <- read_delim(raw_csv, delim = ";", show_col_types = FALSE)
+month_levels <- c("jan", "feb", "mar", "apr", "may", "jun",
+                  "jul", "aug", "sep", "oct", "nov", "dec")
+
+# Cleaning the data
+bank_clean <- bank_raw |>
+  mutate(
+    across(where(is.character), as.factor),
+    y      = factor(y, levels = c("no", "yes")),
+    month  = factor(month, levels = month_levels)
+  ) 
+
+# Sanity checks
+stopifnot(nrow(bank_clean) == nrow(bank_raw),
+          !anyNA(bank_clean$y),
+          all(!is.na(bank_clean$month)))
+
+# Saving cleaned data
+processed_dir <- file.path("data", "processed")
+dir.create(processed_dir, recursive = TRUE, showWarnings = FALSE)
+
+write_csv(bank_clean, file.path(processed_dir, "bank_clean.csv"))
+```
+
+## Analysis
+
+We used logistic regression to predict whether a client would subscribe to a term deposit. The outcome is binary, and logistic regression estimates a subscription probability for each client. These probabilities allow the bank to rank clients for outreach, while the model coefficients help explain how each predictor is associated with subscription when the other predictors are held fixed. Because only a small proportion of clients subscribed, the default classification threshold of 0.50 can miss many actual subscribers. Lowering the threshold can identify more subscribers, but it can also flag more clients who do not subscribe. We therefore used stratified five-fold cross-validation on the training set to examine how different thresholds affect precision, recall, and F1. We chose our threshold with F1 being the classification metric, as the goal is determining clients who might buy the term deposits and missing clients who would buy and calling many who won't is bad for the banks profits and resource allocation.
+
+Before any exploration or modelling, the data was split into a training set (80%, 36,168 clients) and a test set (20%, 9,043 clients), so that the test set did not influence any of our decisions. The analysis was carried out in R (R Core Team, 2026) using the tidyverse (Wickham et al., 2019) for data wrangling and visualization and tidymodels (Kuhn & Wickham, 2020) for modelling. All variables were standardized just prior to model fitting.
+
+```{r}
+# Creating splits
+bank_split <- initial_split(bank_clean, prop = 0.8, strata = y) 
+bank_train <- training(bank_split) 
+bank_test <- testing(bank_split)
+
+write_csv(bank_train, file.path(processed_dir, "bank_train.csv")) 
+write_csv(bank_test, file.path(processed_dir, "bank_test.csv"))
+
+tibble(set = c("train", "test"), 
+       n = c(nrow(bank_train), nrow(bank_test)), 
+       yes_rate = c(mean(bank_train$y == "yes"), mean(bank_test$y == "yes")))
+```
+
+# Results and Discussion
+
+## Exploratory Data Analysis
+
+To understand how each variable relates to subscription before modelling, we explored the demographic and financial health variables in the training set. For each variable, we compared its distribution and the term deposit subscription rate across its values.
 
 ```{r}
 #### Load data
@@ -531,26 +550,7 @@ Clients in default have a median balance of -5 euros, so credit default and acco
 
 ### Summary of exploratory findings
 
-Among the demographic variables, age and job showed the largest differences in
-subscription rate. Subscription followed a U-shaped pattern by age, being highest
-for the youngest and oldest clients, while education and marital status showed
-smaller differences. Among the financial health variables, having a housing
-loan, a personal loan or a credit default was associated with lower
-subscription, and a higher account balance was associated with slightly higher
-subscription. Because the target is imbalanced, with about 12% of clients
-subscribing, we evaluated models using recall as well as accuracy.
-
-## Analysis
-
-We used logistic regression to predict whether a client will subscribe to a term
-deposit. Logistic regression suits this problem because the outcome is binary
-and the model estimates a probability of subscription for each client, which the
-bank could use to rank clients and call the most likely subscribers first. Its
-coefficients are also relatively easy to interpret, which helps explain which
-client characteristics are associated with subscription.
-
-**new added**
-We used logistic regression to predict whether a client would subscribe to a term deposit. The outcome is binary, and logistic regression estimates a subscription probability for each client. These probabilities allow the bank to rank clients for outreach, while the model coefficients help explain how each predictor is associated with subscription when the other predictors are held fixed. Because only a small proportion of clients subscribed, the default classification threshold of 0.50 can miss many actual subscribers. Lowering the threshold can identify more subscribers, but it can also flag more clients who do not subscribe. We therefore used stratified five-fold cross-validation on the training set to examine how different thresholds affect precision, recall, and F1. The following sections describe how we preprocessed the predictors, fitted the model, compared candidate thresholds, and evaluated the final model on the held-out test set.
+Among the demographic variables, age and job showed the largest differences in subscription rate. Subscription followed a U-shaped pattern by age, being highest for the youngest and oldest clients, while education and marital status showed smaller differences. Among the financial health variables, having a housing loan, a personal loan or a credit default was associated with lower subscription, and a higher account balance was associated with slightly higher subscription. Because the target is imbalanced, with about 12% of clients subscribing, we evaluated models using recall as well as accuracy.
 
 ## Preprocessing
 
@@ -558,9 +558,9 @@ We used nine predictors available before the current marketing call: age, marita
 
 We converted categorical predictors to indicator variables and standardized age and account balance. During cross-validation, we estimated these transformations using only the training portion of each fold and applied them to that fold’s validation data. For the final evaluation, we estimated the transformations on the full training set and applied them to the test set.
 
-## Jonah additions below:
+## Training-set evaluation
 
-We chose to use a classification model using a Logistic Regression with all nine predictors. To predict whether a client would accept the term deposit, We compared ten classification thresholds using stratified five-fold cross-validation. We retained 0.15 because it achieved higher recall than 0.20, with a similar mean F1 score. We checked across a range of possible thresholds below 0.5 due to the heavily imbalanced classes in our dataset. We found that a threshold of 0.15 was optimal among the thresholds tested. Because the threshold was selected using only training-data folds, the test set gives an unbiased estimate of performance.
+We chose to use a classification model using a Logistic Regression with all nine predictors. To predict whether a client would accept the term deposit, We compared ten classification thresholds using stratified five-fold cross-validation and checked across a range of possible thresholds below 0.5 due to the heavily imbalanced classes in our dataset. We found that a threshold of 0.15 was optimal among the thresholds tested due to having the highest mean F1 score. Because the threshold was selected using only training-data folds, the test set gives an unbiased estimate of performance.
 
 ```{r}
 #| include: false
@@ -637,7 +637,6 @@ threshold_full |>
   mutate(across(-Threshold, \(x) 100 * x)) |>
   knitr::kable(digits = 2, align = "c")
 ```
-
 
 ## Test-set evaluation
 
@@ -743,6 +742,7 @@ ggplot(metric_plot_data, aes(x = percent, y = metric)) +
 ```
 
 The confusion matrix in @fig-bank-test-confusion shows how the errors were distributed. The model missed 586 actual subscribers and incorrectly predicted subscription for 1,162 non-subscribers. It correctly classified 6,823 of the 7,985 non-subscribers. Overall, the model correctly identified a substantially larger share of non-subscribers than subscribers.
+
 ```{r}
 #| label: fig-bank-test-confusion
 #| fig-cap: "Test-set confusion matrix for logistic regression at the 0.15 classification threshold. Rows show predicted outcomes and columns show actual outcomes."
@@ -753,8 +753,6 @@ autoplot(cm_test, type = "heatmap")
 
 At the 0.15 threshold, the model flagged 1,634 of the 9,043 test-set clients (18.1%). This group contained 44.6% of all actual subscribers. The observed subscription rate among flagged clients was 28.89%, about 2.5 times the overall test-set rate of 11.70%. Thus, actual subscribers were more concentrated in the group flagged by the model.
 
-# Discussion
-
 Our results suggest that information available before a marketing call can help identify clients who are likely to subscribe to a term deposit. At the classification threshold of 0.15, logistic regression achieved an F1 score of 35.07%, with 28.89% precision, 44.61% recall, and 80.67% accuracy on the test set. The model identified 472 of the 1,058 actual subscribers and missed 586. We expected accuracy to give an incomplete picture because most clients did not subscribe. Recall shows how many subscribers the model found, while precision shows how many clients on its proposed call list ultimately subscribed.
 
 The model flagged 1,634 clients for outreach, which 1,162 of them did not subscribe. In practical terms, about 29 out of every 100 clients on the proposed list subscribed. This illustrates the decision the bank faces. A longer call list may reach more potential subscribers, but it also takes more time and increases the number of calls to clients who do not subscribe. The value of the model therefore depends on the bank's call budget and the value of reaching additional subscribers.
@@ -763,5 +761,16 @@ Prasad et al. (2025) compared several classifiers for the same prediction task. 
 
 Logistic regression assumes that the effects of predictors are additive on the log-odds scale and that age and account balance enter as linear terms on that scale. This may limit its ability to capture patterns such as the U-shaped relationship between age and subscription rate observed in the training data. We also evaluated the model on a single test split, so performance may differ in later campaigns. Overall, logistic regression provides a starting point for prioritizing outreach, although it still misses more than half of actual subscribers. A follow-up study could compare logistic regression with a model on a later campaign and measure how many subscribers each model identifies under the same call budget.
 
-# Reference
-Prasad, R., Choubey, M., Baghel, R. K., & Naruka, A. (2025). Term deposit customer prediction: A blending approach using bank marketing data. 2025 IEEE International Students’ Conference on Electrical, Electronics and Computer Science (SCEECS). https://doi.org/10.1109/SCEECS64059.2025.10940622
+# References
+
+Kuhn, M., & Wickham, H. (2020). *Tidymodels: A collection of packages for modeling and machine learning using tidyverse principles* \[Computer software\]. <https://www.tidymodels.org>
+
+Moro, S., Cortez, P., & Rita, P. (2014). A data-driven approach to predict the success of bank telemarketing. *Decision Support Systems, 62*, 22–31. <https://doi.org/10.1016/j.dss.2014.03.001>
+
+Moro, S., Laureano, R., & Cortez, P. (2011). Using data mining for bank direct marketing: An application of the CRISP-DM methodology. In P. Novais et al. (Eds.), *Proceedings of the European Simulation and Modelling Conference (ESM'2011)* (pp. 117–121). EUROSIS. <http://hdl.handle.net/1822/14838>
+
+Moro, S., Rita, P., & Cortez, P. (2014). *Bank marketing* \[Data set\]. UCI Machine Learning Repository. <https://doi.org/10.24432/C5K306>
+
+R Core Team. (2026). *R: A language and environment for statistical computing* (Version 4.6.1) \[Computer software\]. R Foundation for Statistical Computing. <https://www.R-project.org/>
+
+Wickham, H., Averick, M., Bryan, J., Chang, W., McGowan, L. D., François, R., Grolemund, G., Hayes, A., Henry, L., Hester, J., Kuhn, M., Pedersen, T. L., Miller, E., Bache, S. M., Müller, K., Ooms, J., Robinson, D., Seidel, D. P., Spinu, V., … Yutani, H. (2019). Welcome to the tidyverse. *Journal of Open Source Software, 4*(43), 1686. <https://doi.org/10.21105/joss.01686>
