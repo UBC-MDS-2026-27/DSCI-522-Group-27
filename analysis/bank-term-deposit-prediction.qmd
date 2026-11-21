@@ -77,8 +77,8 @@ raw_csv <- list.files(raw_dir, pattern = "^bank-full\\.csv$",
                       recursive = TRUE, full.names = TRUE)[1]
 stopifnot("bank-full.csv not found after unzipping" = !is.na(raw_csv))
 
-raw_csv
-list.files(raw_dir, recursive = TRUE)
+#raw_csv
+#list.files(raw_dir, recursive = TRUE)
 
 bank_raw <- read_delim(raw_csv, delim = ";", show_col_types = FALSE)
 month_levels <- c("jan", "feb", "mar", "apr", "may", "jun",
@@ -111,17 +111,30 @@ We used logistic regression to predict whether a client would subscribe to a ter
 Before any exploration or modelling, the data was split into a training set (80%, 36,168 clients) and a test set (20%, 9,043 clients), so that the test set did not influence any of our decisions. The analysis was carried out in R (R Core Team, 2026) using the tidyverse (Wickham et al., 2019) for data wrangling and visualization and tidymodels (Kuhn & Wickham, 2020) for modelling. All variables were standardized just prior to model fitting.
 
 ```{r}
-# Creating splits
-bank_split <- initial_split(bank_clean, prop = 0.8, strata = y) 
-bank_train <- training(bank_split) 
-bank_test <- testing(bank_split)
+#| label: split-data
+bank_split <- initial_split(bank_clean, prop = 0.8, strata = y)
+bank_train <- training(bank_split)
+bank_test  <- testing(bank_split)
 
-write_csv(bank_train, file.path(processed_dir, "bank_train.csv")) 
-write_csv(bank_test, file.path(processed_dir, "bank_test.csv"))
+write_csv(bank_train, file.path(processed_dir, "bank_train.csv"))
+write_csv(bank_test,  file.path(processed_dir, "bank_test.csv"))
+```
 
-tibble(set = c("train", "test"), 
-       n = c(nrow(bank_train), nrow(bank_test)), 
-       yes_rate = c(mean(bank_train$y == "yes"), mean(bank_test$y == "yes")))
+```{r}
+#| label: tbl-split
+#| tbl-cap: "Train/test split sizes and class balance of the target (term deposit subscription)."
+
+tibble(
+  set = c("Train", "Test"),
+  n = c(nrow(bank_train), nrow(bank_test)),
+  yes_rate = c(mean(bank_train$y == "yes"), mean(bank_test$y == "yes"))
+) |>
+  kable(
+    col.names = c("Set", "Observations", "Proportion 'yes'"),
+    digits = 3,
+    format.args = list(big.mark = ","),
+    align = c("l", "r", "r")
+  )
 ```
 
 # Results and Discussion
@@ -140,14 +153,21 @@ head(bank_df)
 ### Target variable
 
 ```{r}
-#### TARGET: term deposit subscription
+#| label: tbl-target
+#| tbl-cap: "Class balance of the target (term deposit subscription)."
+
 bank_df |>
   rename(is_deposit = y) |>
   count(is_deposit) |>
-  mutate(perc = round(n / sum(n) * 100, 2))
+  mutate(perc = round(n / sum(n) * 100, 2)) |>
+  kable(
+    col.names = c("Subscribed to term deposit", "Count", "Percent (%)"),
+    format.args = list(big.mark = ",", nsmall = 2),
+    align = c("l", "r", "r")
+  )
 ```
 
-The target is imbalanced: only about 12% of clients subscribed.
+As shown in @tbl-target, the target is imbalanced: only about 12% of clients subscribed.
 
 ### Demographic variables
 
@@ -162,7 +182,9 @@ head(bank_demo_df)
 #### Age
 
 ```{r}
-#### AGE
+#| label: tbl-age
+#| tbl-cap: "Summary statistics for client age."
+
 bank_demo_df |>
   summarise(
     mean = mean(age, na.rm = TRUE),
@@ -172,6 +194,11 @@ bank_demo_df |>
     median = median(age, na.rm = TRUE),
     q3 = quantile(age, 0.75, na.rm = TRUE),
     max = max(age, na.rm = TRUE)
+  ) |>
+  kable(
+    col.names = c("Mean", "SD", "Min", "Q1", "Median", "Q3", "Max"),
+    digits = 1,
+    align = "r"
   )
 ```
 
@@ -188,6 +215,9 @@ ggplot(bank_demo_df, aes(x = age)) +
 Age is right-skewed, ranging from 18 to 95 with a median of 39.
 
 ```{r}
+#| label: tbl-age-by-deposit
+#| tbl-cap: "Summary statistics for client age, by term deposit subscription."
+
 bank_demo_df |>
   group_by(is_deposit) |>
   summarise(
@@ -198,6 +228,11 @@ bank_demo_df |>
     median = median(age, na.rm = TRUE),
     q3 = quantile(age, 0.75, na.rm = TRUE),
     max = max(age, na.rm = TRUE)
+  ) |>
+  kable(
+    col.names = c("Subscribed", "Mean", "SD", "Min", "Q1", "Median", "Q3", "Max"),
+    digits = c(0, 1, 1, 0, 0, 0, 0, 0),
+    align = c("l", rep("r", 7))
   )
 ```
 
@@ -213,16 +248,26 @@ ggplot(bank_demo_df, aes(x = age, fill = is_deposit)) +
 ```
 
 ```{r}
-#### AGE GROUPS
+#| label: tbl-age-groups
+#| tbl-cap: "Term deposit subscription rate by age group."
+
 bank_demo_df |>
   mutate(age_group = cut(
     age,
     breaks = c(17, 25, 35, 45, 55, 65, Inf),
     labels = c("18-25", "26-35", "36-45", "46-55", "56-65", "66+")
   )) |>
-  count(age_group, is_deposit) |>
   group_by(age_group) |>
-  mutate(perc = round(n / sum(n) * 100, 2))
+  summarise(
+    n = n(),
+    n_yes = sum(is_deposit == "yes"),
+    perc_yes = round(n_yes / n * 100, 2)
+  ) |>
+  kable(
+    col.names = c("Age group", "Clients", "Subscribed", "Subscription rate (%)"),
+    format.args = list(big.mark = ","),
+    align = c("l", "r", "r", "r")
+  )
 ```
 
 ```{r}
@@ -247,17 +292,24 @@ Subscription is U-shaped by age: about 25% for ages 25 or younger, 9% for ages 3
 #### Marital status
 
 ```{r}
-#### MARITAL
-bank_demo_df |>
-  count(marital) |>
-  mutate(perc = round(n / sum(n) * 100, 2))
-```
+#| label: tbl-marital
+#| tbl-cap: "Marital status distribution and term deposit subscription rate."
 
-```{r}
 bank_demo_df |>
-  count(marital, is_deposit) |>
   group_by(marital) |>
-  mutate(perc = round(n / sum(n) * 100, 2))
+  summarise(
+    n = n(),
+    n_yes = sum(is_deposit == "yes"),
+    perc_yes = round(n_yes / n * 100, 2)
+  ) |>
+  mutate(perc = round(n / sum(n) * 100, 2), .after = n) |>
+  arrange(desc(n)) |>
+  kable(
+    col.names = c("Marital status", "Clients", "Percent of clients (%)",
+                  "Subscribed", "Subscription rate (%)"),
+    format.args = list(big.mark = ","),
+    align = c("l", rep("r", 4))
+  )
 ```
 
 ```{r}
@@ -276,18 +328,24 @@ Most clients are married (60%). Single clients subscribed most (15%) and married
 #### Job
 
 ```{r}
-#### JOB
-bank_demo_df |>
-  count(job) |>
-  mutate(perc = round(n / sum(n) * 100, 2)) |>
-  arrange(desc(n))
-```
+#| label: tbl-job
+#| tbl-cap: "Job distribution and term deposit subscription rate."
 
-```{r}
 bank_demo_df |>
-  count(job, is_deposit) |>
   group_by(job) |>
-  mutate(perc = round(n / sum(n) * 100, 2))
+  summarise(
+    n = n(),
+    n_yes = sum(is_deposit == "yes"),
+    perc_yes = round(n_yes / n * 100, 2)
+  ) |>
+  mutate(perc = round(n / sum(n) * 100, 2), .after = n) |>
+  arrange(desc(n)) |>
+  kable(
+    col.names = c("Job", "Clients", "Percent of clients (%)",
+                  "Subscribed", "Subscription rate (%)"),
+    format.args = list(big.mark = ","),
+    align = c("l", rep("r", 4))
+  )
 ```
 
 ```{r}
@@ -313,17 +371,23 @@ Students (29%) and retirees (23%) subscribed most; blue-collar workers (7%) leas
 #### Education
 
 ```{r}
-#### EDUCATION
-bank_demo_df |>
-  count(education) |>
-  mutate(perc = round(n / sum(n) * 100, 2))
-```
+#| label: tbl-education
+#| tbl-cap: "Education distribution and term deposit subscription rate."
 
-```{r}
 bank_demo_df |>
-  count(education, is_deposit) |>
   group_by(education) |>
-  mutate(perc = round(n / sum(n) * 100, 2))
+  summarise(
+    n = n(),
+    n_yes = sum(is_deposit == "yes"),
+    perc_yes = round(n_yes / n * 100, 2)
+  ) |>
+  mutate(perc = round(n / sum(n) * 100, 2), .after = n) |>
+  kable(
+    col.names = c("Education", "Clients", "Percent of clients (%)",
+                  "Subscribed", "Subscription rate (%)"),
+    format.args = list(big.mark = ","),
+    align = c("l", rep("r", 4))
+  )
 ```
 
 ```{r}
@@ -354,17 +418,24 @@ head(bank_fin_df)
 #### Credit default
 
 ```{r}
-#### DEFAULT
-bank_fin_df |>
-  count(default) |>
-  mutate(perc = round(n / sum(n) * 100, 2))
-```
+#| label: tbl-default
+#| tbl-cap: "Credit default status and term deposit subscription rate."
 
-```{r}
 bank_fin_df |>
-  count(default, is_deposit) |>
   group_by(default) |>
-  mutate(perc = round(n / sum(n) * 100, 2))
+  summarise(
+    n = n(),
+    n_yes = sum(is_deposit == "yes"),
+    perc_yes = round(n_yes / n * 100, 2)
+  ) |>
+  mutate(perc = round(n / sum(n) * 100, 2), .after = n) |>
+  arrange(desc(n)) |>
+  kable(
+    col.names = c("Credit in default", "Clients", "Percent of clients (%)",
+                  "Subscribed", "Subscription rate (%)"),
+    format.args = list(big.mark = ","),
+    align = c("l", rep("r", 4))
+  )
 ```
 
 ```{r}
@@ -383,17 +454,24 @@ Under 2% of clients are in default; they subscribed at 6% vs 12% for others.
 #### Housing loan
 
 ```{r}
-#### HOUSING LOAN
-bank_fin_df |>
-  count(housing) |>
-  mutate(perc = round(n / sum(n) * 100, 2))
-```
+#| label: tbl-housing
+#| tbl-cap: "Housing loan status and term deposit subscription rate."
 
-```{r}
 bank_fin_df |>
-  count(housing, is_deposit) |>
   group_by(housing) |>
-  mutate(perc = round(n / sum(n) * 100, 2))
+  summarise(
+    n = n(),
+    n_yes = sum(is_deposit == "yes"),
+    perc_yes = round(n_yes / n * 100, 2)
+  ) |>
+  mutate(perc = round(n / sum(n) * 100, 2), .after = n) |>
+  arrange(desc(n)) |>
+  kable(
+    col.names = c("Has housing loan", "Clients", "Percent of clients (%)",
+                  "Subscribed", "Subscription rate (%)"),
+    format.args = list(big.mark = ","),
+    align = c("l", rep("r", 4))
+  )
 ```
 
 ```{r}
@@ -412,17 +490,24 @@ Clients without a housing loan subscribed at 17%, over twice the rate of those w
 #### Personal loan
 
 ```{r}
-#### PERSONAL LOAN
-bank_fin_df |>
-  count(loan) |>
-  mutate(perc = round(n / sum(n) * 100, 2))
-```
+#| label: tbl-loan
+#| tbl-cap: "Personal loan status and term deposit subscription rate."
 
-```{r}
 bank_fin_df |>
-  count(loan, is_deposit) |>
   group_by(loan) |>
-  mutate(perc = round(n / sum(n) * 100, 2))
+  summarise(
+    n = n(),
+    n_yes = sum(is_deposit == "yes"),
+    perc_yes = round(n_yes / n * 100, 2)
+  ) |>
+  mutate(perc = round(n / sum(n) * 100, 2), .after = n) |>
+  arrange(desc(n)) |>
+  kable(
+    col.names = c("Has personal loan", "Clients", "Percent of clients (%)",
+                  "Subscribed", "Subscription rate (%)"),
+    format.args = list(big.mark = ","),
+    align = c("l", rep("r", 4))
+  )
 ```
 
 ```{r}
@@ -441,15 +526,31 @@ Clients with a personal loan subscribed at 7% vs 13% for those without.
 #### Combined loan burden
 
 ```{r}
-#### ANY LOAN (housing or personal)
+#| label: tbl-any-loan
+#| tbl-cap: "Any loan (housing or personal) and term deposit subscription rate."
+
 bank_fin_df |>
-  mutate(any_loan = if_else(housing == "yes" | loan == "yes", "yes", "no")) |>
-  count(any_loan, is_deposit) |>
+  mutate(any_loan = if_else(housing == "yes" | loan == "yes", "Yes", "No")) |>
   group_by(any_loan) |>
-  mutate(perc = round(n / sum(n) * 100, 2))
+  summarise(
+    n = n(),
+    n_yes = sum(is_deposit == "yes"),
+    perc_yes = round(n_yes / n * 100, 2)
+  ) |>
+  mutate(perc = round(n / sum(n) * 100, 2), .after = n) |>
+  arrange(desc(n)) |>
+  kable(
+    col.names = c("Has any loan", "Clients", "Percent of clients (%)",
+                  "Subscribed", "Subscription rate (%)"),
+    format.args = list(big.mark = ","),
+    align = c("l", rep("r", 4))
+  )
 ```
 
 ```{r}
+#| label: tbl-loan-status
+#| tbl-cap: "Term deposit subscription rate by combination of housing and personal loans."
+
 bank_fin_df |>
   mutate(loan_status = case_when(
     housing == "yes" & loan == "yes" ~ "Both loans",
@@ -462,7 +563,12 @@ bank_fin_df |>
     n = n(),
     subscription_rate = round(mean(is_deposit == "yes") * 100, 2)
   ) |>
-  arrange(desc(subscription_rate))
+  arrange(desc(subscription_rate)) |>
+  kable(
+    col.names = c("Loan status", "Clients", "Subscription rate (%)"),
+    format.args = list(big.mark = ","),
+    align = c("l", "r", "r")
+  )
 ```
 
 Clients with no loans subscribed at 18% vs 8% for those with at least one.
@@ -470,7 +576,9 @@ Clients with no loans subscribed at 18% vs 8% for those with at least one.
 #### Account balance
 
 ```{r}
-#### BALANCE
+#| label: tbl-balance
+#| tbl-cap: "Summary statistics for client account balance."
+
 bank_fin_df |>
   summarise(
     mean = mean(balance, na.rm = TRUE),
@@ -480,7 +588,13 @@ bank_fin_df |>
     median = median(balance, na.rm = TRUE),
     q3 = quantile(balance, 0.75, na.rm = TRUE),
     max = max(balance, na.rm = TRUE),
-    perc_negative = round(mean(balance < 0) * 100, 2)
+    perc_negative = round(mean(balance < 0, na.rm = TRUE) * 100, 2)
+  ) |>
+  kable(
+    col.names = c("Mean", "SD", "Min", "Q1", "Median", "Q3", "Max", "Negative (%)"),
+    digits = c(1, 1, 0, 0, 0, 0, 0, 2),
+    format.args = list(big.mark = ","),
+    align = "r"
   )
 ```
 
@@ -498,6 +612,9 @@ ggplot(bank_fin_df, aes(x = balance)) +
 Balance is strongly right-skewed (median 450, mean 1,370 euros), and 8% of clients are negative.
 
 ```{r}
+#| label: tbl-balance-by-deposit
+#| tbl-cap: "Summary statistics for client account balance, by term deposit subscription."
+
 bank_fin_df |>
   group_by(is_deposit) |>
   summarise(
@@ -508,7 +625,13 @@ bank_fin_df |>
     median = median(balance, na.rm = TRUE),
     q3 = quantile(balance, 0.75, na.rm = TRUE),
     max = max(balance, na.rm = TRUE),
-    perc_negative = round(mean(balance < 0) * 100, 2)
+    perc_negative = round(mean(balance < 0, na.rm = TRUE) * 100, 2)
+  ) |>
+  kable(
+    col.names = c("Subscribed", "Mean", "SD", "Min", "Q1", "Median", "Q3", "Max", "Negative (%)"),
+    digits = c(0, 1, 1, 0, 0, 0, 0, 0, 2),
+    format.args = list(big.mark = ","),
+    align = c("l", rep("r", 8))
   )
 ```
 
@@ -539,12 +662,20 @@ ggplot(bank_fin_df, aes(x = is_deposit, y = balance, fill = is_deposit)) +
 Subscribers have a higher median balance (710 vs 420 euros), but the distributions overlap heavily.
 
 ```{r}
-#### BALANCE vs DEFAULT
+#| label: tbl-balance-by-default
+#| tbl-cap: "Median and mean account balance by credit default status."
+
 bank_fin_df |>
   group_by(default) |>
   summarise(
     median_balance = median(balance, na.rm = TRUE),
     mean_balance = mean(balance, na.rm = TRUE)
+  ) |>
+  kable(
+    col.names = c("Credit in default", "Median balance", "Mean balance"),
+    digits = c(0, 0, 1),
+    format.args = list(big.mark = ","),
+    align = c("l", "r", "r")
   )
 ```
 
@@ -552,7 +683,7 @@ Clients in default have a median balance of -5 euros, so credit default and acco
 
 ### Summary of exploratory findings
 
-Among the demographic variables, age and job showed the largest differences in subscription rate. Subscription followed a U-shaped pattern by age, being highest for the youngest and oldest clients, while education and marital status showed smaller differences. Among the financial health variables, having a housing loan, a personal loan or a credit default was associated with lower subscription, and a higher account balance was associated with slightly higher subscription. Because the target is imbalanced, with about 12% of clients subscribing, we evaluated models using recall as well as accuracy.
+Among the demographic variables, age and job showed the largest differences in subscription rate. Subscription followed a U-shaped pattern by age, being highest for the youngest and oldest clients, while education and marital status showed smaller differences. Among the financial health variables, having a housing loan, a personal loan or a credit default was associated with lower subscription, and a higher account balance was associated with slightly higher subscription. Because the target is imbalanced, with about 12% of clients subscribing, we evaluated models using F1 instead of accuracy. We also want to balance out recall and precision as both false positives and negatives are harmful to the banks profits and resources.
 
 ## Preprocessing
 
