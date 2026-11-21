@@ -1,5 +1,6 @@
 ---
 title: "Predicting Bank Term Deposit Subscription"
+author: "Anh Nguyen, Takura Nyamayaro, Yingzhu Pan, Jonah Sider-Echenberg"
 format:
   html:
     embed-resources: true
@@ -10,9 +11,92 @@ date: "2026-11-19"
 knitr::opts_chunk$set(echo = TRUE, message = FALSE, warning = FALSE)
 ```
 
-# Overview
 
-We explore demographic (age, marital, job, education) and financial health (default, balance, housing, loan) variables against term deposit subscription, using the training split only.
+# Summary
+
+Only a small share of clients contacted through phone sales agree to subscribe
+to a term deposit: in our data, about 12% of contacted clients subscribed.
+Because every call costs the bank money and staff time, this makes phone
+marketing costly. In this project we aim to improve the efficiency of this type
+of marketing by asking whether information available before a call (a client's
+demographic characteristics, financial health and the outcome of the previous
+campaign) can predict whether the client will subscribe. We trained a logistic
+regression model on the UCI Bank Marketing dataset (Moro, Rita, et al., 2014). On the
+test set, the model reached 89.61% accuracy and correctly identified 184 of the
+1,058 actual subscribers (17.39% recall). These results suggest that pre-call
+information carries some useful signal, but at the default 0.50 classification
+threshold the model still missed most subscribers. The model also assumes linear
+relationships, which may miss patterns such as the U-shaped relationship between
+age and subscription, and it was evaluated on a single test split, so its
+performance in future campaigns may differ.
+
+# Introduction
+
+A term deposit is a savings product in which a client places money with a bank
+for a fixed period in exchange for a fixed interest rate. The Bank Marketing
+dataset records direct marketing campaigns in which a Portuguese bank promoted
+term deposits to its clients through phone calls, often contacting the same
+client more than once (Moro et al., 2011; Moro, Rita, et al., 2014). In this data, only about
+12% of contacted clients subscribed.
+
+This low success rate makes mass calling inefficient. Every unsuccessful call
+costs the bank money and uses staff time that could be spent on clients who are
+more likely to be interested. Repeated calls to clients who do not want the
+product can also frustrate them and harm customer satisfaction. Predicting which
+clients are likely to accept a term deposit would allow the bank to better match
+clients with the banking products they need, increasing client satisfaction,
+financial security and banking profits. Previous work on this dataset has shown
+that data mining models can help predict the success of bank telemarketing calls
+(Moro et al., 2011; Moro, Cortez, et al., 2014).
+
+In this project we ask: **can a client's demographic characteristics, financial
+health and previous campaign outcome, all known before a marketing call, be used
+to predict whether the client will subscribe to a term deposit, so that the bank
+can target likely subscribers instead of mass calling?** We focus only on
+information known before the call, rather than details of the call itself such
+as its duration, because the bank needs to decide whom to call before making the
+call.
+
+# Methods
+
+## Data
+
+We used the Bank Marketing dataset created by Moro, Rita, et al. (2014) and made
+available through the UCI Machine Learning Repository under a Creative Commons
+Attribution 4.0 (CC BY 4.0) license. The data comes from phone-based direct
+marketing campaigns run by a Portuguese bank between May 2008 and November 2010
+(Moro et al., 2011). We used the full version of the data, which contains 45,211 rows.
+Each row represents one client contacted during a campaign and includes 16
+explanatory variables and a binary target recording whether the client
+subscribed to a term deposit ("yes" or "no"). The dataset has no blank missing
+values. Unknown values are instead recorded as an "unknown" category, which we
+kept as its own level (Moro, Rita, et al., 2014).
+
+We divided the explanatory variables used in this analysis into three groups,
+shown in @tbl-variables. We did not use the remaining seven variables. Most of
+them describe the contact made during the current campaign, such as the call
+duration, which is only known after the call has taken place.
+
+| Group | Variables |
+|-------|-----------|
+| Demographic | Age (years), marital status (married, single or divorced, where divorced also includes widowed), job type, education level |
+| Financial health | Credit default, average yearly account balance (euros), housing loan, personal loan |
+| Previous decision | Outcome of the previous marketing campaign (success, failure, other or unknown) |
+
+: Explanatory variables used in this analysis, grouped by type. {#tbl-variables}
+
+Before any exploration or modelling, the data was split into a training set
+(80%, 36,168 clients) and a test set (20%, 9,043 clients), so that the test set
+did not influence any of our decisions. The analysis was carried out in R
+(R Core Team, 2026) using the tidyverse (Wickham et al., 2019) for data wrangling
+and visualization and tidymodels (Kuhn & Wickham, 2020) for modelling.
+
+## Exploratory data analysis
+
+To understand how each variable relates to subscription before modelling, we
+explored the demographic and financial health variables in the training set. For
+each variable, we compared its distribution and the term deposit subscription
+rate across its values.
 
 ```{r}
 set.seed(522)
@@ -32,7 +116,7 @@ bank_df <- read_csv('../data/processed/bank_train.csv')
 head(bank_df)
 ```
 
-## Target variable
+### Target variable
 
 ```{r}
 #### TARGET: term deposit subscription
@@ -44,7 +128,7 @@ bank_df |>
 
 The target is imbalanced: only about 12% of clients subscribed.
 
-## Part 1: Demographic variables
+### Demographic variables
 
 ```{r}
 #### Filter the columns age, marital, job, education and the target column y
@@ -54,7 +138,7 @@ bank_demo_df <- bank_df |> select(age, marital, job, education, y) |>
 head(bank_demo_df)
 ```
 
-### Age
+#### Age
 
 ```{r}
 #### AGE
@@ -139,7 +223,7 @@ bank_demo_df |>
 
 Subscription is U-shaped by age: about 25% for ages 25 or younger, 9% for ages 36-55, and 43% for ages over 65.
 
-### Marital status
+#### Marital status
 
 ```{r}
 #### MARITAL
@@ -168,7 +252,7 @@ ggplot(bank_demo_df, aes(x = marital, fill = is_deposit)) +
 
 Most clients are married (60%). Single clients subscribed most (15%) and married least (10%).
 
-### Job
+#### Job
 
 ```{r}
 #### JOB
@@ -205,7 +289,7 @@ ggplot(bank_demo_df, aes(y = factor(job, levels = job_order), fill = is_deposit)
 
 Students (29%) and retirees (23%) subscribed most; blue-collar workers (7%) least.
 
-### Education
+#### Education
 
 ```{r}
 #### EDUCATION
@@ -236,7 +320,7 @@ ggplot(bank_demo_df,
 
 Subscription rises with education: 9% (primary), 11% (secondary), 15% (tertiary).
 
-## Part 2: Financial health variables
+### Financial health variables
 
 ```{r}
 #### Filter the columns default, balance, housing, loan and the target columns of y
@@ -246,7 +330,7 @@ bank_fin_df <- bank_df |> select(default, balance, housing, loan, y) |>
 head(bank_fin_df)
 ```
 
-### Credit default
+#### Credit default
 
 ```{r}
 #### DEFAULT
@@ -275,7 +359,7 @@ ggplot(bank_fin_df, aes(x = default, fill = is_deposit)) +
 
 Under 2% of clients are in default; they subscribed at 6% vs 12% for others.
 
-### Housing loan
+#### Housing loan
 
 ```{r}
 #### HOUSING LOAN
@@ -304,7 +388,7 @@ ggplot(bank_fin_df, aes(x = housing, fill = is_deposit)) +
 
 Clients without a housing loan subscribed at 17%, over twice the rate of those with one (8%).
 
-### Personal loan
+#### Personal loan
 
 ```{r}
 #### PERSONAL LOAN
@@ -333,7 +417,7 @@ ggplot(bank_fin_df, aes(x = loan, fill = is_deposit)) +
 
 Clients with a personal loan subscribed at 7% vs 13% for those without.
 
-### Combined loan burden
+#### Combined loan burden
 
 ```{r}
 #### ANY LOAN (housing or personal)
@@ -362,7 +446,7 @@ bank_fin_df |>
 
 Clients with no loans subscribed at 18% vs 8% for those with at least one.
 
-### Account balance
+#### Account balance
 
 ```{r}
 #### BALANCE
@@ -445,14 +529,25 @@ bank_fin_df |>
 
 Clients in default have a median balance of -5 euros, so credit default and account balance overlap.
 
-## Summary of findings
+### Summary of exploratory findings
 
-- **Demographics:** age (U-shaped) and job show the biggest differences; education and marital status matter less.
-- **Financial health:** having any loan or a default is associated with lower subscription; higher balance is associated with slightly higher subscription.
+Among the demographic variables, age and job showed the largest differences in
+subscription rate. Subscription followed a U-shaped pattern by age, being highest
+for the youngest and oldest clients, while education and marital status showed
+smaller differences. Among the financial health variables, having a housing
+loan, a personal loan or a credit default was associated with lower
+subscription, and a higher account balance was associated with slightly higher
+subscription. Because the target is imbalanced, with about 12% of clients
+subscribing, we evaluated models using recall as well as accuracy.
 
-# Method
+## Analysis
 
-- @ANH add in the analysis of the variables here, and tie the writing in with the paragraph below in preprocessing.
+We used logistic regression to predict whether a client will subscribe to a term
+deposit. Logistic regression suits this problem because the outcome is binary
+and the model estimates a probability of subscription for each client, which the
+bank could use to rank clients and call the most likely subscribers first. Its
+coefficients are also relatively easy to interpret, which helps explain which
+client characteristics are associated with subscription.
 
 **new added**
 We used logistic regression to predict whether a client would subscribe to a term deposit. The outcome is binary, and logistic regression estimates a subscription probability for each client. These probabilities allow the bank to rank clients for outreach, while the model coefficients help explain how each predictor is associated with subscription when the other predictors are held fixed. Because only a small proportion of clients subscribed, the default classification threshold of 0.50 can miss many actual subscribers. Lowering the threshold can identify more subscribers, but it can also flag more clients who do not subscribe. We therefore used stratified five-fold cross-validation on the training set to examine how different thresholds affect precision, recall, and F1. The following sections describe how we preprocessed the predictors, fitted the model, compared candidate thresholds, and evaluated the final model on the held-out test set.
