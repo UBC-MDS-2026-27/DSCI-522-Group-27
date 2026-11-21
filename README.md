@@ -100,7 +100,7 @@ used it to:
 
 - checking the R syntax for logistic regression model,
 - the references in APA 7 style,
-- improve my wording and format in the analysis report,
+- improve wording and format in the analysis report,
 - help with git stash command.
 
 Example prompts we used:
