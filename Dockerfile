@@ -57,6 +57,7 @@ RUN Rscript -e "renv::restore()"
 # (sshd wants root to own the key file, but on Linux the mounted one is yours.)
 RUN echo "StrictModes no" > /etc/ssh/sshd_config.d/container.conf
 
+# Added to deal with Error (255): Missing privilege separation directory: /run/sshd
 RUN mkdir -p /run/sshd
 
 # Start the ssh server when the container starts.

@@ -4,10 +4,12 @@
 services:
   # the service name: `docker compose run analysis-env ...` uses it
   analysis-env:
+    # Added following to deal with Error (255): Missing privilege separation directory: /run/sshd  
+    # Build the image from the Dockerfile in this repository.
+    build: .
     # CHANGE THIS LINE once: your Docker Hub username / your GitHub repository's
     # name in lowercase, with the sha- tag your workflow pushed (not latest).
     # After that, the workflow updates the tag for you.
-    build: .
     image: jse30/dsci-522-group-27:sha-5a5d9f3
     ports:
       # 2222 on your computer, 22 (ssh) in the container
