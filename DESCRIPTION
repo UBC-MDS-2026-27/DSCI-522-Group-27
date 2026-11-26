@@ -1,4 +1,5 @@
-Type: project
+Type: Project
+Version: 1.0.0
 Description: R packages for the bank term deposit analysis; exact versions are locked in renv.lock.
 Depends:
     tidyverse (== 2.0.0),
