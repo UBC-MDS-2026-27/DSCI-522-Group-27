@@ -8,7 +8,7 @@ services:
     # name in lowercase, with the sha- tag your workflow pushed (not latest).
     # After that, the workflow updates the tag for you.
     build: .
-    image: jse30/dsci-522-group-27:sha-83629ea
+    image: jse30/dsci-522-group-27:sha-5280aff
     ports:
       # 2222 on your computer, 22 (ssh) in the container
       - "2222:22" 
