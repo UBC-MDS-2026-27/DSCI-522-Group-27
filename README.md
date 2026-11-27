@@ -47,7 +47,7 @@ If you already have a public key at `~/.ssh/id_ed25519.pub`, skip this step. Oth
 ```bash
 ssh-keygen -t ed25519
 ```
-Docker Compose uses the public key to let contributors connect to the container over SSH.
+Docker Compose uses the public key to let contributors connect to the container over SSH. Without this key, Docker creates a folder named `~/.ssh/id_ed25519.pub`, and connecting to the container fails until you delete that folder and create the key.
 
 ### 2. Download the Docker image
 

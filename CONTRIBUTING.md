@@ -1,7 +1,3 @@
-------------------------------------------------------------------------
-
-editor_options: markdown: wrap: 72 ---
-
 # Contributing to the Term Deposit Predictor project
 
 This outlines how to propose a change to the project.
@@ -29,6 +25,13 @@ Before your first session, install [Positron](https://positron.posit.co/download
 git config --global user.name
 git config --global user.email
 ```
+If either value is missing, run the corresponding command below on your computer. Replace the example name and email with your own details. Use an email address associated with your GitHub account.
+
+```bash
+git config --global user.name "Your Name"
+git config --global user.email "you@example.com"
+```
+Docker Compose shares your Git configuration with the container so that commits you make there use your name and email.
 
 1.  Start the container from the repository root:
 
