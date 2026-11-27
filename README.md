@@ -25,73 +25,54 @@ The source is [`analysis/bank-term-deposit-prediction.qmd`](analysis/bank-term-d
 
 ## Usage
 
-These steps work on macOS and Windows. Run every command from the root of
-the repository (the `DSCI-522-Group-27` folder) unless otherwise noted.
+Run the analysis in Docker to use the same versions of R, Quarto, and the
+required R packages as the project team.
+The project's Docker image is published on
+[Docker Hub](https://hub.docker.com/r/jse30/dsci-522-group-27).
 
-### 1. Install the required software
+### Set up the project
 
-- [Git](https://git-scm.com/downloads)
-- [R](https://cran.r-project.org/) version 4.6.1
-- [Quarto](https://quarto.org/docs/get-started/) version 1.10 or higher
-- (Optional) [RStudio](https://posit.co/download/rstudio-desktop/)
-
-On Windows, use Git Bash or PowerShell for the terminal commands below.
-
-### 2. Clone the repository
-
-In a terminal, run:
+Install [Docker Desktop](https://www.docker.com/products/docker-desktop/) and start it before running the commands below. In a terminal, clone the repository and move into it.
 
 ```bash
 git clone https://github.com/UBC-MDS-2026-27/DSCI-522-Group-27.git
 cd DSCI-522-Group-27
 ```
+Run the remaining commands from the repository root.
 
-### 3. Install the R packages
+### 1. Set up an SSH key
 
-Start R from the repository root. You can either open `DSCI-522-Group-27.Rproj`
-in RStudio, or type `R` in the terminal (on Windows, open R from the Start menu
-and run `setwd("path/to/DSCI-522-Group-27")` first).
-
-The project's `.Rprofile` activates [renv](https://rstudio.github.io/renv/)
-automatically, and installs renv itself if needed. Then, in the R console, run:
-
-```r
-renv::restore()
-```
-
-Type `Y` when asked to proceed. This installs the exact package versions
-recorded in `renv.lock` into a project library, so it does not change your
-other R projects. The first run can take several minutes.
-
-
-### 4. Render the report
-
-Quit R (`q()`), then in the terminal run:
+If you already have a public key at `~/.ssh/id_ed25519.pub`, skip this step. Otherwise, run the following command and press Enter when prompted for the save location to accept the default path.
 
 ```bash
-quarto render analysis/bank-term-deposit-prediction.qmd
+ssh-keygen -t ed25519
 ```
+Docker Compose uses the public key to let contributors connect to the container over SSH. Without this key, Docker creates a folder named `~/.ssh/id_ed25519.pub`, and connecting to the container fails until you delete that folder and create the key.
 
-If you are already in the `analysis/` directory, run:
+### 2. Download the Docker image
+
+In a terminal, run:
 
 ```bash
-quarto render bank-term-deposit-prediction.qmd
+docker compose pull
 ```
 
-This needs an internet connection the first time. It downloads the data from
-UCI into `data/raw/`, cleans it, writes the cleaned data and the training and
-test sets to `data/processed/`, runs the exploratory data analysis and the
-model, and creates `analysis/bank-term-deposit-prediction.html`. Open that
-file in a web browser to read the report.
+### 3. Run the analysis and render the report
+
+In a terminal, run:
+
+```bash
+docker compose run --rm analysis-env quarto render analysis/bank-term-deposit-prediction.qmd
+```
+
+Open `analysis/bank-term-deposit-prediction.html` in a web browser to view the report. The `--rm` option removes the container when the command finishes. The HTML report stays in your local repository.
+
+To make changes to the project, see [CONTRIBUTING.md](CONTRIBUTING.md).
+
 
 ## Dependencies
 
-- R 4.6.1
-- renv 1.3.1
-- Quarto 1.10 or higher
-- R packages, with exact versions recorded in [`renv.lock`](renv.lock).
-  The main packages are tidyverse (2.0.0), tidymodels (1.5.0), rsample,
-  knitr and rmarkdown.
+The Docker image includes R, Quarto, and the R packages needed to render the report. Direct R dependencies are declared in [`DESCRIPTION`](DESCRIPTION), and package versions for the full R environment are recorded in [`renv.lock`](renv.lock).
 
 ## AI use statement
 
