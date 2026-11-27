@@ -19,7 +19,7 @@ under a CC BY 4.0 license.
 ## Report
 
 The final report is available here:
-<https://ubc-mds-2026-27.github.io/DSCI-522-Group-27/analysis/bank-term-deposit-prediction.html>
+<https://ubc-mds-2026-27.github.io/DSCI-522-Group-27/>
 
 The source is [`analysis/bank-term-deposit-prediction.qmd`](analysis/bank-term-deposit-prediction.qmd).
 
